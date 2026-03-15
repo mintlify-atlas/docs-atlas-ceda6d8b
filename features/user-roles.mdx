@@ -1,0 +1,116 @@
+---
+title: 'User roles'
+description: 'Magic Film has three user roles — guest, registered, and admin — each with a distinct set of permissions.'
+keywords: ['roles', 'permissions', 'admin', 'guest', 'registered', 'invitado', 'registrado', 'cinephile']
+---
+
+Magic Film uses a three-role system stored in the `usuarios` table. The role is enforced on the backend via JWT authentication middleware and a dedicated `adminOnly` middleware.
+
+```sql
+rol ENUM('invitado','registrado','admin') NOT NULL DEFAULT 'registrado'
+```
+
+## Role overview
+
+<CardGroup cols={3}>
+  <Card title="Guest" icon="eye">
+    Browse films and read existing analyses — no account required.
+  </Card>
+  <Card title="Registered" icon="user">
+    Generate analyses, save favorites, and build a personalized cinephile profile.
+  </Card>
+  <Card title="Admin" icon="shield">
+    Full film management, AI regeneration, and access to the monitoring panel.
+  </Card>
+</CardGroup>
+
+## Permissions comparison
+
+| Permission | Guest (`invitado`) | Registered (`registrado`) | Admin (`admin`) |
+|---|:---:|:---:|:---:|
+| Search for films | ✓ | ✓ | ✓ |
+| View existing analyses | ✓ | ✓ | ✓ |
+| Generate new AI analyses | — | ✓ | ✓ |
+| Save favorites | — | ✓ | ✓ |
+| Personalized recommendations | — | ✓ | ✓ |
+| Complete onboarding / cinephile profile | — | ✓ | ✓ |
+| Add / modify / delete films | — | — | ✓ |
+| Regenerate AI analyses | — | — | ✓ |
+| Force-override analysis classification | — | — | ✓ |
+| Access admin monitoring panel | — | — | ✓ |
+| View `historial_admin` audit log | — | — | ✓ |
+
+## Role details
+
+<Tabs>
+  <Tab title="Guest">
+    The `invitado` role requires no registration. Any visitor to Magic Film can:
+
+    - Search for any film by title using TMDB data
+    - Browse search results with poster, year, rating, and genre information
+    - Read analyses that registered users or admins have already triggered
+
+    <Note>
+      Guests cannot trigger AI generation. If a film has no saved analysis yet, guests see a prompt to register.
+    </Note>
+  </Tab>
+  <Tab title="Registered">
+    The `registrado` role is the default when a new account is created (`DEFAULT 'registrado'` in the schema). Registered users can do everything a guest can, plus:
+
+    - **Generate analyses** — trigger Google Gemini 1.5 Flash to produce a new analysis for any film that doesn't have one yet
+    - **Save favorites** — add films to a personal list via the `favoritos` table
+    - **Personalized recommendations** — the system uses your preferred genres (`usuario_generos` table) and cinephile level to surface relevant films
+    - **Onboarding** — complete a cinephile profile setup flow (`onboarding_completo` flag) that sets your genre preferences and cinephile level
+
+    <Tip>
+      Complete the onboarding flow after registering to unlock genre-based recommendations. The `onboarding_completo` field is `FALSE` by default and is set to `TRUE` once you finish the setup.
+    </Tip>
+  </Tab>
+  <Tab title="Admin">
+    The `admin` role has full platform access. Admins can:
+
+    - **Manage films** — add, modify, or delete records in the `peliculas` table
+    - **Regenerate analyses** — force a new AI generation for any film, even if one already exists
+    - **Override classification** — set `tipo_forzado = TRUE` on any film to manually assign `entretenimiento` or `profundo` mode
+    - **Monitor the platform** — view the admin panel (`admin.html`) with usage statistics and system state
+    - **Audit log** — all admin actions are recorded in `historial_admin` with the action type, target entity, and timestamp
+
+    Admin-only routes are protected by the `adminOnly` middleware, which verifies both a valid JWT and `rol = 'admin'` before allowing access.
+
+    ```sql
+    -- historial_admin records every admin action
+    accion ENUM('agregar','modificar','eliminar','regenerar_ia')
+    ```
+
+    <Note>
+      The initial admin account (`admin@magicfilm.com`) is seeded directly in `schema.sql`. Additional admins must be promoted manually by updating the `rol` field in the database.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Cinephile levels
+
+Registered users are assigned a cinephile level based on their activity and profile. This level influences personalized recommendations and is displayed on the user profile.
+
+```sql
+nivel_cinefilo ENUM('explorador','entusiasta','experto') DEFAULT NULL
+```
+
+| Level | `nivel_cinefilo` | Description |
+|---|---|---|
+| Explorer | `explorador` | New to the platform; building a watch history and preferences |
+| Enthusiast | `entusiasta` | Regular user with defined genre preferences and a growing favorites list |
+| Expert | `experto` | Power user with broad viewing history and deep engagement with analyses |
+
+<Info>
+  The `nivel_cinefilo` field is `NULL` until a user completes onboarding. Genre preferences are stored in the `usuario_generos` join table and are used alongside the cinephile level for recommendation ranking.
+</Info>
+
+## Authentication and middleware
+
+Role enforcement happens at the backend via two middleware layers:
+
+- **`authMiddleware`** — validates the JWT on every protected route and attaches the decoded user (including `rol`) to the request object
+- **`adminOnly`** — runs after `authMiddleware` and rejects requests where `rol` is not `'admin'`
+
+All user data is stored in the `usuarios` table with `password_hash` (never plain text) and a soft-delete `activo` flag.

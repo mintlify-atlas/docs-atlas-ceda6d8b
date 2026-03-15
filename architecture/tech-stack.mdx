@@ -1,0 +1,146 @@
+---
+title: "Tech stack"
+description: "Every technology used in Magic Film, why it was chosen, and where it fits in the system."
+keywords: ["tech stack", "Node.js", "Express", "MySQL", "Gemini", "TMDB", "JWT", "Vercel"]
+---
+
+Magic Film uses a deliberately lean stack: a static frontend, a Node.js REST API, a single MySQL database, and two external AI/data APIs. There are no heavy frameworks on the frontend and no ORM on the backend — SQL is written directly so the query logic stays readable and auditable.
+
+## Full stack table
+
+| Layer | Technology | Version / detail |
+|---|---|---|
+| Frontend | HTML5 | — |
+| Frontend | CSS3 | Custom properties via `variables.css` |
+| Frontend | JavaScript | ES6+ (no framework) |
+| Backend | Node.js | Current LTS |
+| Backend | Express.js | REST API framework |
+| Database | MySQL | Character set `utf8mb4`, collation `utf8mb4_unicode_ci` |
+| AI — generative | Google Gemini | Model: `gemini-1.5-flash` |
+| Film data | TMDB API | v3 — base URL `https://api.themoviedb.org/3` |
+| Authentication | JWT | 7-day expiry (`JWT_EXPIRES_IN=7d`) |
+| Deployment | Vercel | `version: 2` (`vercel.json`) |
+
+## Technology decisions
+
+<Tabs>
+  <Tab title="Frontend">
+    ### HTML5 · CSS3 · JavaScript ES6+
+
+    Magic Film's UI is built with plain HTML, CSS, and vanilla JavaScript — no React, Vue, or Angular. This keeps the frontend lightweight and deployable as static files on Vercel without a build step.
+
+    CSS custom properties (defined in `frontend/css/variables.css`) provide a single source of truth for colours, spacing, and typography across all pages and components.
+
+    JavaScript `fetch` calls hit the backend REST API exclusively. The frontend never imports an API key or SDK for TMDB or Gemini.
+
+    ```
+    frontend/
+    ├── pages/           → HTML files
+    ├── css/
+    │   ├── variables.css    ← design tokens
+    │   ├── global.css
+    │   ├── components/
+    │   └── pages/
+    ├── js/
+    │   ├── api/             ← fetch wrappers
+    │   ├── components/
+    │   └── pages/
+    └── assets/
+    ```
+  </Tab>
+  <Tab title="Backend">
+    ### Node.js + Express.js
+
+    Express provides the routing layer, middleware pipeline, and JSON serialisation. The project follows an MVC structure where routes, controllers, models, services, and middlewares each live in their own directory.
+
+    The entry point is `backend/server.js`. Configuration is split into `backend/config/db.js` (MySQL pool) and `backend/config/env.js` (environment variable validation).
+
+    ```javascript
+    // Environment variables consumed by the backend
+    PORT=3000
+    NODE_ENV=development
+
+    DB_HOST=localhost
+    DB_PORT=3306
+    DB_NAME=magic_film
+
+    TMDB_API_KEY=...
+    TMDB_BASE_URL=https://api.themoviedb.org/3
+
+    GEMINI_API_KEY=...
+    GEMINI_MODEL=gemini-1.5-flash
+
+    JWT_SECRET=...
+    JWT_EXPIRES_IN=7d
+    ```
+
+    <Note>
+      All secrets live in `.env` and are never committed to source control. Copy `.env.example` to get started.
+    </Note>
+  </Tab>
+  <Tab title="Database">
+    ### MySQL — `magic_filmv01`
+
+    MySQL was chosen for its strong relational integrity support (foreign keys, CHECK constraints, ENUMs) and wide hosting availability. The database is created with `CHARACTER SET utf8mb4` and `COLLATE utf8mb4_unicode_ci` to handle film titles and analysis text in any language, including emoji.
+
+    The schema defines 12 tables covering users, films, AI analyses, favourites, search history, admin audit logs, and AI call logs. See the [database schema](/architecture/database-schema) page for full table documentation.
+
+    ```sql
+    CREATE DATABASE IF NOT EXISTS magic_filmv01
+      CHARACTER SET utf8mb4
+      COLLATE utf8mb4_unicode_ci;
+    ```
+  </Tab>
+  <Tab title="AI & APIs">
+    ### Google Gemini 1.5 Flash
+
+    Gemini generates the structured film analyses. The `gemini-1.5-flash` model balances quality and speed for text generation tasks. The backend calls Gemini only when no cached analysis exists in MySQL, avoiding repeated costs for the same film.
+
+    The AI key is stored in `GEMINI_API_KEY` and the model in `GEMINI_MODEL=gemini-1.5-flash`. API calls are logged to the `log_ia` table with prompt text, estimated tokens, and response time in milliseconds.
+
+    ### TMDB API v3
+
+    The Movie Database (TMDB) API provides film metadata: title, year, director, runtime, synopsis, budget, revenue, rating, poster URL, genres, and keywords. The base URL is `https://api.themoviedb.org/3`.
+
+    TMDB data is stored in the `peliculas` table via the `tmdb_id` foreign key, so the API is called once per film rather than on every request.
+
+    <Tip>
+      Get your TMDB API key at `https://www.themoviedb.org/settings/api` and your Gemini key at `https://aistudio.google.com`.
+    </Tip>
+  </Tab>
+  <Tab title="Auth & Deployment">
+    ### JWT authentication
+
+    JSON Web Tokens are issued on login and expire after 7 days (`JWT_EXPIRES_IN=7d`). The `authMiddleware` validates the token on every protected route. Role information (`invitado`, `registrado`, `admin`) is encoded in the token payload, allowing `adminOnly` middleware to gate admin endpoints without an extra database lookup.
+
+    ### Vercel
+
+    The project is deployed on Vercel using API version 2 (configured in `vercel.json`). The static frontend files are served directly from Vercel's CDN while the backend functions run as serverless endpoints.
+
+    ```json
+    {
+      "version": 2
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Environment variables reference
+
+The following variables must be set before starting the server. All values are defined in `.env.example`.
+
+| Variable | Example value | Purpose |
+|---|---|---|
+| `PORT` | `3000` | HTTP server port |
+| `NODE_ENV` | `development` | Runtime environment (`development` \| `production`) |
+| `DB_HOST` | `localhost` | MySQL host |
+| `DB_PORT` | `3306` | MySQL port |
+| `DB_NAME` | `magic_film` | Database name |
+| `DB_USER` | `root` | MySQL user |
+| `DB_PASSWORD` | — | MySQL password |
+| `TMDB_API_KEY` | — | TMDB API key |
+| `TMDB_BASE_URL` | `https://api.themoviedb.org/3` | TMDB base URL |
+| `GEMINI_API_KEY` | — | Google Gemini API key |
+| `GEMINI_MODEL` | `gemini-1.5-flash` | Gemini model identifier |
+| `JWT_SECRET` | — | Secret used to sign JWTs |
+| `JWT_EXPIRES_IN` | `7d` | JWT expiry duration |

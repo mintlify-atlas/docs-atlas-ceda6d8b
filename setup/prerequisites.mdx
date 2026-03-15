@@ -1,0 +1,34 @@
+---
+title: "Prerequisites"
+description: "Everything you need before installing Magic Film on your local machine."
+---
+
+Before you set up Magic Film, make sure you have the following tools and credentials ready.
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node" href="https://nodejs.org">
+    Magic Film runs on Node.js. Install the latest LTS version from the official site.
+  </Card>
+  <Card title="MySQL" icon="database" href="https://dev.mysql.com/downloads/mysql/">
+    Magic Film uses MySQL as its primary database. You need a running MySQL server (version 8.0 or later recommended).
+  </Card>
+  <Card title="TMDB API key" icon="film" href="https://www.themoviedb.org/settings/api">
+    Magic Film fetches movie metadata from The Movie Database (TMDB). Register for a free API key at `themoviedb.org/settings/api`.
+  </Card>
+  <Card title="Google Gemini API key" icon="sparkles" href="https://aistudio.google.com">
+    Magic Film uses Google Gemini 1.5 Flash to generate cinematic analysis. Get your API key at `aistudio.google.com`.
+  </Card>
+  <Card title="Git" icon="git-branch" href="https://git-scm.com">
+    You need Git to clone the repository and manage the project source.
+  </Card>
+</CardGroup>
+
+## Summary checklist
+
+Before continuing to [Installation](/setup/installation), confirm you have:
+
+- Node.js installed (`node -v` prints a version)
+- A running MySQL server (`mysql --version` prints a version)
+- A TMDB API key from [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
+- A Google Gemini API key from [aistudio.google.com](https://aistudio.google.com)
+- Git installed (`git --version` prints a version)

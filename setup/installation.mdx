@@ -1,0 +1,91 @@
+---
+title: "Installation"
+description: "Step-by-step guide to running Magic Film on your local machine."
+---
+
+Follow these steps to clone, configure, and start Magic Film locally.
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the Magic Film repository from GitHub and navigate into the project directory.
+
+    ```bash
+    git clone https://github.com/Michael5006/magic-film.git
+    cd magic-film
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Install the Node.js dependencies defined in `package.json`.
+
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Set up environment variables">
+    Copy the example environment file and fill in your credentials.
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Open `.env` in your editor and replace every placeholder value with your real credentials. See [Environment variables](/setup/environment-variables) for a full description of each variable.
+
+    <Warning>
+      Never commit your `.env` file to version control. It contains secrets such as your database password, API keys, and JWT secret.
+    </Warning>
+  </Step>
+
+  <Step title="Create the MySQL database">
+    Start your MySQL server, then run the schema file to create the `magic_filmv01` database and all tables.
+
+    ```bash
+    mysql -u root -p < database/schema.sql
+    ```
+
+    This command creates the `magic_filmv01` database (with `utf8mb4` encoding), all tables, indexes, and seeds the initial genres and admin user.
+
+    <Note>
+      If you also want sample data loaded for development, run the seed file after the schema:
+
+      ```bash
+      mysql -u root -p magic_filmv01 < database/seeds/data_prueba.sql
+      ```
+    </Note>
+  </Step>
+
+  <Step title="Start the server">
+    Launch the backend server.
+
+    ```bash
+    node backend/server.js
+    ```
+
+    By default the server listens on port `3000`. You can override this with the `PORT` environment variable. Once the server is running, open your browser and load the frontend from the `frontend/pages/` directory.
+  </Step>
+</Steps>
+
+## Project structure
+
+```
+magic-film/
+├── backend/
+│   ├── config/          # DB connection and environment config
+│   ├── controllers/     # Business logic per entity
+│   ├── models/          # Database queries (SQL)
+│   ├── routes/          # REST endpoint definitions
+│   ├── middlewares/     # Auth, adminOnly, input validation
+│   ├── services/        # TMDB, Gemini, and classifier integrations
+│   ├── utils/           # Reusable helpers (errors, responses)
+│   └── server.js        # Server entry point
+├── frontend/
+│   ├── pages/           # HTML files
+│   ├── css/
+│   └── js/
+├── database/
+│   ├── schema.sql
+│   └── seeds/
+├── .env.example
+└── package.json
+```

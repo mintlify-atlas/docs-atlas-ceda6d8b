@@ -1,0 +1,124 @@
+---
+title: 'Film details'
+description: 'Retrieve the full record for a single film stored in Magic Film.'
+api: 'GET /api/peliculas/{id}'
+---
+
+Returns all columns from the `peliculas` table for the specified film.
+
+<Info>
+  Authentication is optional. Guest users may fetch film details without a token.
+</Info>
+
+## Path parameters
+
+<ParamField path="id" type="number" required>
+  The internal Magic Film ID for the film (the `id` column of the `peliculas` table). This is **not** the TMDB ID.
+</ParamField>
+
+## Response
+
+<ResponseField name="pelicula" type="object" required>
+  <Expandable title="properties" defaultOpen={true}>
+    <ResponseField name="id" type="number">
+      Internal Magic Film ID.
+    </ResponseField>
+    <ResponseField name="tmdb_id" type="number">
+      Corresponding TMDB identifier.
+    </ResponseField>
+    <ResponseField name="titulo" type="string">
+      Localised title.
+    </ResponseField>
+    <ResponseField name="titulo_original" type="string">
+      Original-language title, or `null`.
+    </ResponseField>
+    <ResponseField name="anio" type="number">
+      Release year.
+    </ResponseField>
+    <ResponseField name="director" type="string">
+      Director name, or `null`.
+    </ResponseField>
+    <ResponseField name="duracion_min" type="number">
+      Runtime in minutes, or `null`.
+    </ResponseField>
+    <ResponseField name="sinopsis" type="string">
+      Plot summary, or `null`.
+    </ResponseField>
+    <ResponseField name="presupuesto" type="number">
+      Production budget in USD, or `null`.
+    </ResponseField>
+    <ResponseField name="recaudacion" type="number">
+      Box-office gross in USD, or `null`.
+    </ResponseField>
+    <ResponseField name="calificacion" type="number">
+      Average rating on a 0–10 scale.
+    </ResponseField>
+    <ResponseField name="poster_url" type="string">
+      Poster image URL, or `null`.
+    </ResponseField>
+    <ResponseField name="keywords" type="object[]">
+      JSON array of keyword tags associated with the film.
+    </ResponseField>
+    <ResponseField name="tipo_analisis" type="string">
+      Default analysis depth. One of `entretenimiento` or `profundo`.
+    </ResponseField>
+    <ResponseField name="tipo_forzado" type="boolean">
+      Whether the `tipo_analisis` has been manually overridden by an admin.
+    </ResponseField>
+    <ResponseField name="activa" type="boolean">
+      Whether the film is visible in the catalogue.
+    </ResponseField>
+    <ResponseField name="creado_en" type="string">
+      ISO 8601 timestamp of record creation.
+    </ResponseField>
+    <ResponseField name="actualizado_en" type="string">
+      ISO 8601 timestamp of last update.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url http://localhost:3000/api/peliculas/1
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "pelicula": {
+    "id": 1,
+    "tmdb_id": 27205,
+    "titulo": "Inception",
+    "titulo_original": "Inception",
+    "anio": 2010,
+    "director": "Christopher Nolan",
+    "duracion_min": 148,
+    "sinopsis": "Un ladrón que roba secretos corporativos a través del uso de la tecnología de compartir sueños...",
+    "presupuesto": 160000000,
+    "recaudacion": 836836967,
+    "calificacion": 8.4,
+    "poster_url": "https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg",
+    "keywords": ["sueños", "robo", "ciencia ficción"],
+    "tipo_analisis": "profundo",
+    "tipo_forzado": false,
+    "activa": true,
+    "creado_en": "2026-03-01T08:00:00.000Z",
+    "actualizado_en": "2026-03-10T12:30:00.000Z"
+  }
+}
+```
+
+```json 404
+{
+  "error": "Película no encontrada."
+}
+```
+
+</ResponseExample>

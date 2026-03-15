@@ -1,0 +1,138 @@
+---
+title: 'Analysis modes'
+description: 'Magic Film generates two distinct types of AI analysis — Entertainment and Deep — automatically selected based on TMDB genre and keyword data.'
+keywords: ['analysis', 'entertainment', 'deep', 'profundo', 'entretenimiento', 'Gemini', 'capas']
+---
+
+Every film analysed by Magic Film is assigned one of two modes: **Entertainment** (`entretenimiento`) or **Deep** (`profundo`). Each mode produces a different set of content layers (`capas_analisis`), tailored to the nature of the film. Analyses are generated once by Google Gemini 1.5 Flash, stored in MySQL, and served from the database on every subsequent request — no repeated AI calls.
+
+## How the mode is selected
+
+When a film is first fetched from TMDB, Magic Film's internal classifier inspects the film's **genres** and **keywords** from TMDB and assigns a value to the `tipo_analisis` field on the `peliculas` table.
+
+```sql
+tipo_analisis ENUM('entretenimiento','profundo') NOT NULL DEFAULT 'entretenimiento'
+```
+
+The classifier resolves to `profundo` for films that match patterns associated with arthouse cinema, folk horror, psychological drama, and similar genres. Everything else defaults to `entretenimiento`.
+
+<Info>
+  Admins can override the automatic classification by setting `tipo_forzado = TRUE` on the `peliculas` record. When this flag is set, the classifier result is ignored and the manually assigned `tipo_analisis` value is used instead.
+</Info>
+
+## Content layers by mode
+
+Each mode produces a fixed set of layers stored in the `capas_analisis` table. The `nombre_capa` ENUM defines every valid layer name.
+
+```sql
+nombre_capa ENUM(
+  'resumen','momentos','easter_eggs','curiosidades',   -- entretenimiento
+  'narrativa','simbolismo','contexto','tecnica','conclusion'  -- profundo
+)
+```
+
+<Tabs>
+  <Tab title="Entertainment mode">
+    **Target films:** blockbusters, comedies, action films, animated features, mainstream releases.
+
+    The Entertainment mode produces four layers designed for casual viewers who want engaging context without deep critical analysis.
+
+    | Layer | `nombre_capa` | Description |
+    |---|---|---|
+    | Summary | `resumen` | A spoiler-free overview of the plot and premise |
+    | Epic moments | `momentos` | The standout scenes and sequences worth watching for |
+    | Easter eggs | `easter_eggs` | Hidden references, callbacks, and in-jokes embedded in the film |
+    | Production trivia | `curiosidades` | Behind-the-scenes facts about casting, production, and filming |
+
+    <Tip>
+      The `resumen` layer is intentionally spoiler-free so you can read it before watching the film.
+    </Tip>
+  </Tab>
+  <Tab title="Deep mode">
+    **Target films:** arthouse cinema, author-driven dramas, folk horror, psychological films, culturally significant works.
+
+    The Deep mode produces five layers for viewers who want a full critical and contextual breakdown.
+
+    | Layer | `nombre_capa` | Description |
+    |---|---|---|
+    | Narrative | `narrativa` | Structural and thematic analysis of the storytelling |
+    | Symbolism | `simbolismo` | Visual and narrative symbols and their meanings |
+    | Context | `contexto` | Cultural, historical, and directorial context |
+    | Technique | `tecnica` | Cinematographic and directorial craft analysis |
+    | Conclusion | `conclusion` | A synthesised critical takeaway |
+  </Tab>
+</Tabs>
+
+## Analysis schema
+
+Each analysis is a row in the `analisis` table linked to a film, with individual layers stored in `capas_analisis`.
+
+```sql
+-- One row per film
+CREATE TABLE analisis (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  pelicula_id   INT UNSIGNED NOT NULL UNIQUE,
+  tipo          ENUM('entretenimiento','profundo') NOT NULL,
+  modelo_ia     VARCHAR(100) DEFAULT 'gemini-1.5-flash',
+  estado        ENUM('pendiente','generando','completo','error') DEFAULT 'pendiente',
+  idioma        VARCHAR(5) DEFAULT 'es',
+  eliminado     BOOLEAN NOT NULL DEFAULT FALSE,
+  generado_en   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- One row per layer per analysis
+CREATE TABLE capas_analisis (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  analisis_id   INT UNSIGNED NOT NULL,
+  modo          ENUM('entretenimiento','profundo') NOT NULL,
+  nombre_capa   ENUM(
+    'resumen','momentos','easter_eggs','curiosidades',
+    'narrativa','simbolismo','contexto','tecnica','conclusion'
+  ) NOT NULL,
+  contenido     LONGTEXT NOT NULL,
+  orden         TINYINT UNSIGNED NOT NULL DEFAULT 1
+);
+```
+
+All analyses are generated in Spanish (`idioma = 'es'`) and stored in `LONGTEXT` fields to accommodate long-form AI output.
+
+## Analysis generation workflow
+
+<Steps>
+  <Step title="Film is searched and fetched from TMDB">
+    You search for a film. The backend retrieves genres, keywords, and metadata from TMDB and saves the record to the `peliculas` table.
+  </Step>
+  <Step title="Classifier assigns a mode">
+    The internal classifier reads the TMDB genre and keyword data and sets `tipo_analisis` to either `entretenimiento` or `profundo`. If `tipo_forzado` is `TRUE`, the admin-assigned value is used instead.
+  </Step>
+  <Step title="Check for existing analysis">
+    The backend checks whether a row already exists in `analisis` for this `pelicula_id` with `estado = 'completo'`. If it does, the saved layers are returned immediately — no AI call is made.
+  </Step>
+  <Step title="Generate with Google Gemini">
+    If no analysis exists, the backend sets `estado = 'generando'`, builds a structured prompt for Google Gemini 1.5 Flash, and requests the appropriate layer set for the assigned mode.
+  </Step>
+  <Step title="Layers are saved">
+    Each returned layer is inserted into `capas_analisis` as a separate row. The `analisis.estado` is updated to `'completo'`, and the AI call metadata (prompt, token count, response time) is logged to `log_ia`.
+  </Step>
+  <Step title="Results are displayed">
+    The frontend renders each layer in the analysis view (`analisis.html`), organised in the `orden` sequence defined for that mode.
+  </Step>
+</Steps>
+
+## Admin override
+
+Admins can override both the mode classification and regenerate analyses from the admin panel. The `tipo_forzado` flag on the `peliculas` table signals that the classification was set manually.
+
+```sql
+-- Force a film into Deep mode, bypassing the classifier
+UPDATE peliculas
+SET tipo_analisis = 'profundo',
+    tipo_forzado  = TRUE
+WHERE tmdb_id = 123456;
+```
+
+Admin actions are logged to the `historial_admin` table with `accion = 'regenerar_ia'`.
+
+<Note>
+  Only users with `rol = 'admin'` can set `tipo_forzado` or trigger a regeneration. See [User roles](/features/user-roles) for the full permissions breakdown.
+</Note>

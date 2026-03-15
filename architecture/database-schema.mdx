@@ -1,0 +1,486 @@
+---
+title: "Database schema"
+description: "Complete reference for every table, column, index, and seed record in the Magic Film MySQL database."
+keywords: ["database", "schema", "MySQL", "tables", "SQL", "magic_filmv01"]
+---
+
+Magic Film uses a single MySQL database named `magic_filmv01`, created with `CHARACTER SET utf8mb4` and `COLLATE utf8mb4_unicode_ci`. This ensures full Unicode support for film titles, analysis text, and user content in any language.
+
+```sql
+CREATE DATABASE IF NOT EXISTS magic_filmv01
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+The schema is defined in `database/schema.sql` (version 0.1, March 2026).
+
+## Tables
+
+<AccordionGroup>
+
+  <Accordion title="generos — Film genres">
+    Stores the canonical list of film genres. Genres are seeded once and referenced by both films and users.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Unique genre identifier |
+    | `nombre` | `VARCHAR(50)` | NOT NULL, UNIQUE | Genre name (e.g. `Acción`, `Drama`) |
+    | `creado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | Row creation timestamp |
+
+    ```sql
+    CREATE TABLE generos (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nombre VARCHAR(50) NOT NULL UNIQUE,
+      creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="usuarios — User accounts">
+    Holds every registered user, their credentials, role, cinephile level, and onboarding state.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Unique user identifier |
+    | `nombre_usuario` | `VARCHAR(50)` | NOT NULL, UNIQUE | Login username |
+    | `email` | `VARCHAR(150)` | NOT NULL, UNIQUE | Email address |
+    | `password_hash` | `VARCHAR(255)` | NOT NULL | Bcrypt password hash |
+    | `nombre_completo` | `VARCHAR(100)` | — | Display name |
+    | `rol` | `ENUM` | NOT NULL, DEFAULT `'registrado'` | `'invitado'` \| `'registrado'` \| `'admin'` |
+    | `nivel_cinefilo` | `ENUM` | DEFAULT NULL | `'explorador'` \| `'entusiasta'` \| `'experto'` |
+    | `onboarding_completo` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | Whether the user has completed onboarding |
+    | `activo` | `BOOLEAN` | NOT NULL, DEFAULT TRUE | Soft-delete / account status flag |
+    | `creado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | Account creation timestamp |
+    | `actualizado_en` | `TIMESTAMP` | ON UPDATE CURRENT_TIMESTAMP | Last update timestamp |
+
+    **`rol` values**
+
+    | Value | Description |
+    |---|---|
+    | `invitado` | Can search films and read existing analyses; no account required |
+    | `registrado` | Can generate analyses, save favourites, and receive personalised recommendations |
+    | `admin` | Full film management, analysis regeneration, and monitoring panel |
+
+    **`nivel_cinefilo` values**
+
+    | Value | Description |
+    |---|---|
+    | `explorador` | Casual viewer; set during onboarding |
+    | `entusiasta` | Regular film watcher |
+    | `experto` | Dedicated cinephile |
+
+    ```sql
+    CREATE TABLE usuarios (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      nombre_usuario VARCHAR(50) NOT NULL UNIQUE,
+      email VARCHAR(150) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      nombre_completo VARCHAR(100),
+      rol ENUM('invitado','registrado','admin') NOT NULL DEFAULT 'registrado',
+      nivel_cinefilo ENUM('explorador','entusiasta','experto') DEFAULT NULL,
+      onboarding_completo BOOLEAN NOT NULL DEFAULT FALSE,
+      activo BOOLEAN NOT NULL DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="usuario_generos — User genre preferences (N:M)">
+    Junction table linking users to their preferred genres. Used to power personalised film recommendations.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `usuario_id` | `INT UNSIGNED` | PK (composite), FK → `usuarios.id` | User reference |
+    | `genero_id` | `INT UNSIGNED` | PK (composite), FK → `generos.id` | Genre reference |
+
+    Both foreign keys use `ON DELETE CASCADE`, so preferences are removed when a user or genre is deleted.
+
+    ```sql
+    CREATE TABLE usuario_generos (
+      usuario_id INT UNSIGNED NOT NULL,
+      genero_id INT UNSIGNED NOT NULL,
+      PRIMARY KEY (usuario_id, genero_id),
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+      FOREIGN KEY (genero_id) REFERENCES generos(id) ON DELETE CASCADE
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="peliculas — Films (primary source)">
+    The core film record. Data is sourced from TMDB and enriched with the AI classifier result (`tipo_analisis`).
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Internal film identifier |
+    | `tmdb_id` | `INT UNSIGNED` | UNIQUE | TMDB film ID |
+    | `titulo` | `VARCHAR(255)` | NOT NULL | Localised title |
+    | `titulo_original` | `VARCHAR(255)` | — | Original-language title |
+    | `anio` | `YEAR` | — | Release year |
+    | `director` | `VARCHAR(150)` | — | Director name |
+    | `duracion_min` | `SMALLINT UNSIGNED` | — | Runtime in minutes |
+    | `sinopsis` | `TEXT` | — | Plot synopsis |
+    | `presupuesto` | `BIGINT UNSIGNED` | — | Production budget (USD) |
+    | `recaudacion` | `BIGINT UNSIGNED` | — | Box office revenue (USD) |
+    | `calificacion` | `DECIMAL(3,1)` | CHECK 0–10 | TMDB audience rating |
+    | `poster_url` | `VARCHAR(500)` | — | Poster image URL |
+    | `keywords` | `JSON` | — | TMDB keyword array |
+    | `tipo_analisis` | `ENUM` | NOT NULL, DEFAULT `'entretenimiento'` | `'entretenimiento'` \| `'profundo'` |
+    | `tipo_forzado` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | `TRUE` when an admin manually overrides the classifier result |
+    | `activa` | `BOOLEAN` | NOT NULL, DEFAULT TRUE | Soft-delete flag |
+    | `creado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | Row creation timestamp |
+    | `actualizado_en` | `TIMESTAMP` | ON UPDATE CURRENT_TIMESTAMP | Last update timestamp |
+
+    **`tipo_analisis` values**
+
+    | Value | Target films | Analysis content |
+    |---|---|---|
+    | `entretenimiento` | Blockbusters, comedies, series | Summary without spoilers, epic moments, Easter eggs, production trivia |
+    | `profundo` | Art-house films, dramas, folk horror | Visual symbolism, themes, cultural context, director analysis |
+
+    ```sql
+    CREATE TABLE peliculas (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      tmdb_id INT UNSIGNED UNIQUE,
+      titulo VARCHAR(255) NOT NULL,
+      titulo_original VARCHAR(255),
+      anio YEAR,
+      director VARCHAR(150),
+      duracion_min SMALLINT UNSIGNED,
+      sinopsis TEXT,
+      presupuesto BIGINT UNSIGNED,
+      recaudacion BIGINT UNSIGNED,
+      calificacion DECIMAL(3,1),
+      poster_url VARCHAR(500),
+      keywords JSON,
+      tipo_analisis ENUM('entretenimiento','profundo') NOT NULL DEFAULT 'entretenimiento',
+      tipo_forzado BOOLEAN NOT NULL DEFAULT FALSE,
+      activa BOOLEAN NOT NULL DEFAULT TRUE,
+      creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CHECK (calificacion BETWEEN 0 AND 10)
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="catalogo_peliculas — Search and listing cache">
+    A denormalised manager table that centralises searches and catalogue listings. Avoids full-table scans on `peliculas` for common list views.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Row identifier |
+    | `pelicula_id` | `INT UNSIGNED` | NOT NULL, FK → `peliculas.id` | Source film reference |
+    | `titulo` | `VARCHAR(255)` | NOT NULL | Cached film title (indexed for fast search) |
+    | `anio` | `YEAR` | — | Cached release year |
+    | `calificacion` | `DECIMAL(3,1)` | — | Cached rating |
+    | `poster_url` | `VARCHAR(500)` | — | Cached poster URL |
+    | `texto_busqueda` | `TEXT` | — | Full-text search blob |
+    | `actualizado_en` | `TIMESTAMP` | ON UPDATE CURRENT_TIMESTAMP | Cache freshness timestamp |
+
+    ```sql
+    CREATE TABLE catalogo_peliculas (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      pelicula_id INT UNSIGNED NOT NULL,
+      titulo VARCHAR(255) NOT NULL,
+      anio YEAR,
+      calificacion DECIMAL(3,1),
+      poster_url VARCHAR(500),
+      texto_busqueda TEXT,
+      actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (pelicula_id) REFERENCES peliculas(id) ON DELETE CASCADE
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="pelicula_generos — Film genre tags (N:M)">
+    Junction table linking films to their TMDB genres.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `pelicula_id` | `INT UNSIGNED` | PK (composite), FK → `peliculas.id` | Film reference |
+    | `genero_id` | `INT UNSIGNED` | PK (composite), FK → `generos.id` | Genre reference |
+
+    Both foreign keys use `ON DELETE CASCADE`.
+
+    ```sql
+    CREATE TABLE pelicula_generos (
+      pelicula_id INT UNSIGNED NOT NULL,
+      genero_id INT UNSIGNED NOT NULL,
+      PRIMARY KEY (pelicula_id, genero_id),
+      FOREIGN KEY (pelicula_id) REFERENCES peliculas(id) ON DELETE CASCADE,
+      FOREIGN KEY (genero_id) REFERENCES generos(id) ON DELETE CASCADE
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="analisis — AI analysis records">
+    One row per film. Tracks the generation state of the Gemini analysis, the model used, and whether it has been soft-deleted.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Analysis identifier |
+    | `pelicula_id` | `INT UNSIGNED` | NOT NULL, UNIQUE, FK → `peliculas.id` | One analysis per film |
+    | `tipo` | `ENUM` | NOT NULL | `'entretenimiento'` \| `'profundo'` |
+    | `modelo_ia` | `VARCHAR(100)` | DEFAULT `'gemini-1.5-flash'` | Gemini model used |
+    | `estado` | `ENUM` | DEFAULT `'pendiente'` | Generation state (see below) |
+    | `idioma` | `VARCHAR(5)` | DEFAULT `'es'` | Analysis language code |
+    | `eliminado` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | Soft-delete flag |
+    | `generado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | First generation timestamp |
+    | `actualizado_en` | `TIMESTAMP` | ON UPDATE CURRENT_TIMESTAMP | Last update timestamp |
+
+    **`estado` values**
+
+    | Value | Meaning |
+    |---|---|
+    | `pendiente` | Analysis has been queued but generation has not started |
+    | `generando` | Gemini API call is in progress |
+    | `completo` | Analysis generated and all layers saved successfully |
+    | `error` | Generation failed; check `log_ia` for details |
+
+    ```sql
+    CREATE TABLE analisis (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      pelicula_id INT UNSIGNED NOT NULL UNIQUE,
+      tipo ENUM('entretenimiento','profundo') NOT NULL,
+      modelo_ia VARCHAR(100) DEFAULT 'gemini-1.5-flash',
+      estado ENUM('pendiente','generando','completo','error') DEFAULT 'pendiente',
+      idioma VARCHAR(5) DEFAULT 'es',
+      eliminado BOOLEAN NOT NULL DEFAULT FALSE,
+      generado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (pelicula_id) REFERENCES peliculas(id) ON DELETE CASCADE
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="capas_analisis — Analysis layers">
+    Stores the individual content sections of a Gemini analysis. Each analysis is split into named layers that map directly to the UI panels shown to the user.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Layer identifier |
+    | `analisis_id` | `INT UNSIGNED` | NOT NULL, FK → `analisis.id` | Parent analysis |
+    | `modo` | `ENUM` | NOT NULL | `'entretenimiento'` \| `'profundo'` |
+    | `nombre_capa` | `ENUM` | NOT NULL | Layer name (see full list below) |
+    | `contenido` | `LONGTEXT` | NOT NULL | Gemini-generated content for this layer |
+    | `orden` | `TINYINT UNSIGNED` | NOT NULL, DEFAULT 1 | Display order in the UI |
+
+    The pair `(analisis_id, nombre_capa)` is unique — each analysis holds at most one instance of each layer.
+
+    **`nombre_capa` ENUM values**
+
+    | Value | Mode | Description |
+    |---|---|---|
+    | `resumen` | `entretenimiento` | Spoiler-free plot summary |
+    | `momentos` | `entretenimiento` | Epic or memorable moments |
+    | `easter_eggs` | `entretenimiento` | Hidden references and Easter eggs |
+    | `curiosidades` | `entretenimiento` | Production trivia and behind-the-scenes facts |
+    | `narrativa` | `profundo` | Narrative structure and storytelling analysis |
+    | `simbolismo` | `profundo` | Visual symbolism and motifs |
+    | `contexto` | `profundo` | Cultural and historical context |
+    | `tecnica` | `profundo` | Cinematographic and directorial technique |
+    | `conclusion` | `profundo` | Synthesis and thematic conclusion |
+
+    ```sql
+    CREATE TABLE capas_analisis (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      analisis_id INT UNSIGNED NOT NULL,
+      modo ENUM('entretenimiento','profundo') NOT NULL,
+      nombre_capa ENUM(
+        'resumen','momentos','easter_eggs','curiosidades',
+        'narrativa','simbolismo','contexto','tecnica','conclusion'
+      ) NOT NULL,
+      contenido LONGTEXT NOT NULL,
+      orden TINYINT UNSIGNED NOT NULL DEFAULT 1,
+      UNIQUE KEY uq_analisis_capa (analisis_id, nombre_capa),
+      FOREIGN KEY (analisis_id) REFERENCES analisis(id) ON DELETE CASCADE
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="favoritos — User favourites">
+    Tracks which films each registered user has saved. The composite unique key prevents duplicate entries.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Row identifier |
+    | `usuario_id` | `INT UNSIGNED` | NOT NULL, FK → `usuarios.id` | User who saved the film |
+    | `pelicula_id` | `INT UNSIGNED` | NOT NULL, FK → `peliculas.id` | Saved film |
+    | `guardado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | When the film was saved |
+
+    The pair `(usuario_id, pelicula_id)` is unique.
+
+    ```sql
+    CREATE TABLE favoritos (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT UNSIGNED NOT NULL,
+      pelicula_id INT UNSIGNED NOT NULL,
+      guardado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_favorito (usuario_id, pelicula_id),
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+      FOREIGN KEY (pelicula_id) REFERENCES peliculas(id) ON DELETE CASCADE
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="historial_busquedas — Search history">
+    Records every search made by a registered user. `pelicula_id` is nullable — if the user searched for a term that did not match a film, the column is left as `NULL`.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Row identifier |
+    | `usuario_id` | `INT UNSIGNED` | NOT NULL, FK → `usuarios.id` | User who performed the search |
+    | `termino_buscado` | `VARCHAR(255)` | NOT NULL | Raw search string |
+    | `pelicula_id` | `INT UNSIGNED` | FK → `peliculas.id` ON DELETE SET NULL | Matched film, if any |
+    | `buscado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | Search timestamp |
+
+    ```sql
+    CREATE TABLE historial_busquedas (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      usuario_id INT UNSIGNED NOT NULL,
+      termino_buscado VARCHAR(255) NOT NULL,
+      pelicula_id INT UNSIGNED,
+      buscado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+      FOREIGN KEY (pelicula_id) REFERENCES peliculas(id) ON DELETE SET NULL
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="historial_admin — Admin audit log">
+    Immutable audit trail of every action performed by an administrator. All admin mutations (add, modify, delete, AI regeneration) produce a row here.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Row identifier |
+    | `admin_id` | `INT UNSIGNED` | NOT NULL, FK → `usuarios.id` | Admin who performed the action |
+    | `accion` | `ENUM` | NOT NULL | Action type (see below) |
+    | `entidad` | `VARCHAR(50)` | NOT NULL | Table or resource affected (e.g. `peliculas`) |
+    | `entidad_id` | `INT UNSIGNED` | — | ID of the specific record affected |
+    | `detalle` | `VARCHAR(500)` | — | Free-text description of the change |
+    | `realizado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | When the action was performed |
+
+    **`accion` values**
+
+    | Value | Description |
+    |---|---|
+    | `agregar` | A new record was created |
+    | `modificar` | An existing record was updated |
+    | `eliminar` | A record was deleted or soft-deleted |
+    | `regenerar_ia` | An AI analysis was regenerated via the admin panel |
+
+    ```sql
+    CREATE TABLE historial_admin (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      admin_id INT UNSIGNED NOT NULL,
+      accion ENUM('agregar','modificar','eliminar','regenerar_ia') NOT NULL,
+      entidad VARCHAR(50) NOT NULL,
+      entidad_id INT UNSIGNED,
+      detalle VARCHAR(500),
+      realizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (admin_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    );
+    ```
+  </Accordion>
+
+  <Accordion title="log_ia — AI call log">
+    Records every call made to the Gemini API. Used to monitor token usage, detect failures, and measure generation latency.
+
+    | Column | Type | Constraints | Description |
+    |---|---|---|---|
+    | `id` | `INT UNSIGNED` | PK, AUTO_INCREMENT | Row identifier |
+    | `analisis_id` | `INT UNSIGNED` | FK → `analisis.id` ON DELETE SET NULL | Related analysis (nullable — log is preserved if the analysis is deleted) |
+    | `prompt_usado` | `TEXT` | — | Full prompt sent to Gemini |
+    | `tokens_estimados` | `INT` | — | Estimated token count for the request |
+    | `tiempo_ms` | `INT` | — | API response time in milliseconds |
+    | `creado_en` | `TIMESTAMP` | DEFAULT CURRENT_TIMESTAMP | Log entry creation timestamp |
+
+    ```sql
+    CREATE TABLE log_ia (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      analisis_id INT UNSIGNED,
+      prompt_usado TEXT,
+      tokens_estimados INT,
+      tiempo_ms INT,
+      creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (analisis_id) REFERENCES analisis(id) ON DELETE SET NULL
+    );
+    ```
+  </Accordion>
+
+</AccordionGroup>
+
+## Optimisation indexes
+
+The following indexes are created after the table definitions to speed up the most common query patterns.
+
+| Index name | Table | Column | Purpose |
+|---|---|---|---|
+| `idx_peliculas_tmdb` | `peliculas` | `tmdb_id` | Fast lookup when fetching a film by its TMDB ID |
+| `idx_catalogo_titulo` | `catalogo_peliculas` | `titulo` | Fast title search in the catalogue |
+| `idx_favoritos_usuario` | `favoritos` | `usuario_id` | Retrieve all favourites for a given user |
+| `idx_usuario_generos` | `usuario_generos` | `usuario_id` | Retrieve all genre preferences for a given user |
+| `idx_pelicula_generos` | `pelicula_generos` | `pelicula_id` | Retrieve all genres for a given film |
+| `idx_historial_busquedas` | `historial_busquedas` | `usuario_id` | Retrieve search history for a given user |
+| `idx_capas_analisis` | `capas_analisis` | `analisis_id` | Retrieve all layers for a given analysis |
+
+```sql
+CREATE INDEX idx_peliculas_tmdb        ON peliculas (tmdb_id);
+CREATE INDEX idx_catalogo_titulo       ON catalogo_peliculas (titulo);
+CREATE INDEX idx_favoritos_usuario     ON favoritos (usuario_id);
+CREATE INDEX idx_usuario_generos       ON usuario_generos (usuario_id);
+CREATE INDEX idx_pelicula_generos      ON pelicula_generos (pelicula_id);
+CREATE INDEX idx_historial_busquedas   ON historial_busquedas (usuario_id);
+CREATE INDEX idx_capas_analisis        ON capas_analisis (analisis_id);
+```
+
+## Seed data
+
+The schema ships with two seed `INSERT` statements that run on first setup.
+
+### 12 genres
+
+The `generos` table is pre-populated with 12 film genres:
+
+```sql
+INSERT INTO generos (nombre) VALUES
+  ('Acción'),('Drama'),('Comedia'),('Terror'),
+  ('Ciencia Ficción'),('Thriller'),('Romance'),('Psicológico'),
+  ('Animación'),('Documental'),('Histórico'),('Musical');
+```
+
+| # | Genre |
+|---|---|
+| 1 | Acción |
+| 2 | Drama |
+| 3 | Comedia |
+| 4 | Terror |
+| 5 | Ciencia Ficción |
+| 6 | Thriller |
+| 7 | Romance |
+| 8 | Psicológico |
+| 9 | Animación |
+| 10 | Documental |
+| 11 | Histórico |
+| 12 | Musical |
+
+### Admin user
+
+A default admin account is inserted with `onboarding_completo = TRUE`. You must replace `HASH_PENDIENTE` with a real bcrypt hash before deploying.
+
+```sql
+INSERT INTO usuarios (
+  nombre_usuario, email, password_hash, nombre_completo, rol, onboarding_completo
+) VALUES (
+  'admin',
+  'admin@magicfilm.com',
+  'HASH_PENDIENTE',
+  'Administrador Magic Film',
+  'admin',
+  TRUE
+);
+```
+
+<Warning>
+  The seed script inserts `password_hash = 'HASH_PENDIENTE'`. You must replace this with a real bcrypt hash before the admin account can be used to log in.
+</Warning>

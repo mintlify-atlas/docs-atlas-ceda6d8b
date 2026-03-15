@@ -1,0 +1,85 @@
+---
+title: "Deploy to Vercel"
+description: "How to deploy Magic Film to Vercel and configure environment variables for production."
+---
+
+Magic Film is deployed to Vercel. The live demo is available at [magic-film.vercel.app](https://magic-film.vercel.app).
+
+## vercel.json
+
+The repository includes a minimal `vercel.json` at the project root:
+
+```json
+{
+  "version": 2
+}
+```
+
+This tells Vercel to use the v2 build system. No additional routing or build configuration is required — Vercel infers the project type automatically.
+
+## Deploy steps
+
+<Steps>
+  <Step title="Push your code to GitHub">
+    Make sure your Magic Film repository is pushed to a GitHub account or organization. Vercel connects directly to GitHub to pull your source.
+
+    ```bash
+    git add .
+    git commit -m "ready for deployment"
+    git push origin main
+    ```
+  </Step>
+
+  <Step title="Connect the repository to Vercel">
+    1. Go to [vercel.com](https://vercel.com) and sign in.
+    2. Click **Add New Project**.
+    3. Select **Import Git Repository** and choose your `magic-film` repository.
+    4. Vercel detects the `vercel.json` and configures the project automatically.
+  </Step>
+
+  <Step title="Set environment variables">
+    Before deploying, add all required environment variables in the Vercel dashboard:
+
+    1. Open your project in the Vercel dashboard.
+    2. Go to **Settings → Environment Variables**.
+    3. Add each variable listed below for the **Production** environment (and optionally **Preview** and **Development**).
+
+    | Variable | Description |
+    |---|---|
+    | `PORT` | Usually not needed — Vercel manages the port automatically |
+    | `NODE_ENV` | Set to `production` |
+    | `DB_HOST` | Hostname of your production MySQL server |
+    | `DB_PORT` | MySQL port (default `3306`) |
+    | `DB_NAME` | Production database name (`magic_filmv01`) |
+    | `DB_USER` | MySQL user |
+    | `DB_PASSWORD` | MySQL password |
+    | `TMDB_API_KEY` | Your TMDB v3 API key |
+    | `TMDB_BASE_URL` | `https://api.themoviedb.org/3` |
+    | `GEMINI_API_KEY` | Your Google Gemini API key |
+    | `GEMINI_MODEL` | `gemini-1.5-flash` |
+    | `JWT_SECRET` | A strong random string for signing JWTs |
+    | `JWT_EXPIRES_IN` | `7d` (or your preferred duration) |
+
+    <Warning>
+      Never paste environment variable values into `vercel.json` or any file committed to the repository. Always use the Vercel dashboard or the Vercel CLI (`vercel env add`) to manage secrets.
+    </Warning>
+  </Step>
+
+  <Step title="Deploy">
+    Click **Deploy** in the Vercel dashboard. Vercel builds and deploys the project. When the deployment finishes, Vercel provides a production URL.
+
+    The official live deployment is at [magic-film.vercel.app](https://magic-film.vercel.app).
+  </Step>
+
+  <Step title="Redeploy after changes">
+    Every push to the `main` branch triggers an automatic redeployment on Vercel. Pull request branches get isolated Preview deployments automatically.
+  </Step>
+</Steps>
+
+## Production database
+
+Vercel does not host MySQL. For a production MySQL database, use a managed service (such as PlanetScale, Railway, or any cloud MySQL provider) and set the `DB_*` environment variables in the Vercel dashboard to point to that service.
+
+<Note>
+  Make sure your production MySQL instance is accessible from Vercel's servers. If you use an IP allowlist on your database, add Vercel's outbound IP ranges.
+</Note>

@@ -1,0 +1,88 @@
+---
+title: "Google Gemini integration"
+description: "How Magic Film uses Google Gemini 1.5 Flash to generate adaptive cinematic analysis."
+---
+
+## What is Gemini 1.5 Flash?
+
+Google Gemini 1.5 Flash is a fast, cost-efficient large language model optimized for high-throughput tasks. Magic Film uses it to generate structured cinematic analysis in Spanish — either a light entertainment breakdown or a deep author-cinema analysis — depending on the film type detected by the internal classifier.
+
+## Why Gemini 1.5 Flash
+
+Gemini 1.5 Flash was chosen for its combination of speed and quality at scale. Cinematic analysis requires understanding of narrative structure, visual symbolism, cultural context, and production trivia — Gemini 1.5 Flash handles all of these reliably while keeping response times and costs low.
+
+## Configuration
+
+| Variable | Value |
+|---|---|
+| `GEMINI_API_KEY` | Your personal Gemini API key |
+| `GEMINI_MODEL` | `gemini-1.5-flash` |
+
+Set both variables in your `.env` file. See [Environment variables](/setup/environment-variables) for details.
+
+## Getting an API key
+
+Visit [aistudio.google.com](https://aistudio.google.com), sign in with a Google account, and generate an API key. Paste it as the value of `GEMINI_API_KEY` in your `.env`.
+
+```bash
+GEMINI_API_KEY=your_gemini_key_here
+GEMINI_MODEL=gemini-1.5-flash
+```
+
+## Analysis types and prompts
+
+Magic Film generates two completely different prompts depending on the film classification:
+
+<Tabs>
+  <Tab title="Entertainment">
+    Applied to blockbusters, comedies, action films, and mainstream releases. The prompt instructs Gemini to produce:
+
+    - **Resumen** — spoiler-free summary
+    - **Momentos** — epic or memorable moments
+    - **Easter eggs** — hidden references and callbacks
+    - **Curiosidades** — behind-the-scenes production trivia
+
+    These correspond to the `resumen`, `momentos`, `easter_eggs`, and `curiosidades` values in the `capas_analisis.nombre_capa` column.
+  </Tab>
+  <Tab title="Deep">
+    Applied to arthouse films, author cinema, psychological dramas, and folk horror. The prompt instructs Gemini to produce:
+
+    - **Narrativa** — narrative and storytelling structure
+    - **Simbolismo** — visual and symbolic language
+    - **Contexto** — cultural and historical context
+    - **Técnica** — directorial technique and cinematography
+    - **Conclusión** — closing interpretive synthesis
+
+    These correspond to the `narrativa`, `simbolismo`, `contexto`, `tecnica`, and `conclusion` values in the `capas_analisis.nombre_capa` column.
+  </Tab>
+</Tabs>
+
+## Caching: Gemini is only called once per film
+
+Before calling Gemini, the backend checks whether an analysis for the requested film already exists in the `analisis` table with `estado = 'completo'`. If it does, the cached layers from `capas_analisis` are returned immediately — Gemini is never called.
+
+```
+Request for analysis
+    ↓
+Check analisis table (estado = 'completo'?)
+    ├── YES → return capas_analisis rows  (fast, no API cost)
+    └── NO  → call Gemini → save to analisis + capas_analisis → return
+```
+
+<Note>
+  Because Gemini is only called when no cached analysis exists, API costs are bounded by the number of unique films analyzed — not by the number of users who view the analysis. Once a film is analyzed, all subsequent requests are served from the database at no cost.
+</Note>
+
+## Logging
+
+Every Gemini call is recorded in the `log_ia` table:
+
+| Column | Description |
+|---|---|
+| `analisis_id` | Foreign key to the `analisis` row created for this call |
+| `prompt_usado` | The full prompt text sent to Gemini |
+| `tokens_estimados` | Estimated token count for the request |
+| `tiempo_ms` | Wall-clock time in milliseconds for the Gemini call |
+| `creado_en` | Timestamp of the log entry |
+
+This log lets administrators monitor usage, audit prompt quality, and track generation times from the admin panel.

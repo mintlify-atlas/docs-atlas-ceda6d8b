@@ -1,0 +1,83 @@
+---
+title: 'Search films'
+description: 'Search the Magic Film catalogue and the TMDB database by title or keyword.'
+api: 'GET /api/peliculas/buscar'
+---
+
+Returns a list of films matching the search query. Results are sourced from the local `catalogo_peliculas` table and, when appropriate, proxied from the TMDB API.
+
+<Info>
+  Authentication is optional. Guest users may search without a token.
+</Info>
+
+## Query parameters
+
+<ParamField query="q" type="string" required>
+  The search string. Matched against film titles and the `texto_busqueda` full-text column in `catalogo_peliculas`.
+</ParamField>
+
+## Response
+
+Returns an array of film summary objects.
+
+<ResponseField name="peliculas" type="object[]" required>
+  <Expandable title="Film object properties" defaultOpen={true}>
+    <ResponseField name="tmdb_id" type="number">
+      The TMDB identifier for the film. Use this value to fetch full details via [GET /api/peliculas/:id](/api/films/details).
+    </ResponseField>
+    <ResponseField name="titulo" type="string">
+      Localised title of the film.
+    </ResponseField>
+    <ResponseField name="anio" type="number">
+      Release year.
+    </ResponseField>
+    <ResponseField name="poster_url" type="string">
+      URL of the film's poster image, or `null` if unavailable.
+    </ResponseField>
+    <ResponseField name="calificacion" type="number">
+      Average rating on a 0–10 scale.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url 'http://localhost:3000/api/peliculas/buscar?q=inception'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "peliculas": [
+    {
+      "tmdb_id": 27205,
+      "titulo": "Inception",
+      "anio": 2010,
+      "poster_url": "https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg",
+      "calificacion": 8.4
+    },
+    {
+      "tmdb_id": 264660,
+      "titulo": "Ex Machina",
+      "anio": 2014,
+      "poster_url": "https://image.tmdb.org/t/p/w500/btTdmkgIvOi0FFip1sPuZI2oQG6.jpg",
+      "calificacion": 7.7
+    }
+  ]
+}
+```
+
+```json 400
+{
+  "error": "El parámetro 'q' es obligatorio."
+}
+```
+
+</ResponseExample>

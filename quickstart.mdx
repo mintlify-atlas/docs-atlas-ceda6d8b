@@ -1,80 +1,75 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Get up and running with Magic Film — visit the demo, create an account, and generate your first AI film analysis."
 ---
 
-## Get started in three steps
-
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+Magic Film is live as an interactive frontend demo. You can explore the full user flow right now — search for a film, set your cinephile level, and view an AI analysis — directly in your browser.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Backend integrations (TMDB API, Google Gemini, and MySQL) are still in development. The current demo at [magic-film.vercel.app](https://magic-film.vercel.app) showcases the complete UI and navigation flow with mockup data.
 </Note>
+
+## Get started
+
+<Steps>
+  <Step title="Visit the live demo">
+    Open [magic-film.vercel.app](https://magic-film.vercel.app) in your browser. You land on `index.html` — the home page — which introduces the platform and provides entry points to log in or register.
+  </Step>
+
+  <Step title="Create an account">
+    Click **Registrarse** to open `registro.html`. Fill in your username, email, full name, and password to create a registered account.
+
+    Registered accounts unlock analysis generation, saving favorites, and personalized recommendations. Guests can browse and view existing analyses without registering.
+  </Step>
+
+  <Step title="Complete onboarding">
+    After registration you are directed to `onboarding.html`. Here you select your **cinephile level** — one of three tiers stored on your profile:
+
+    | Level | `nivel_cinefilo` value | Description |
+    |-------|------------------------|-------------|
+    | Explorer | `explorador` | New to film analysis |
+    | Enthusiast | `entusiasta` | Watches widely across genres |
+    | Expert | `experto` | Deep knowledge of film history and theory |
+
+    You also choose your preferred genres from the available list (Action, Drama, Comedy, Horror, Sci-Fi, Thriller, Romance, Psychological, Animation, Documentary, Historical, Musical). These preferences drive personalized recommendations once backend integrations are live.
+  </Step>
+
+  <Step title="Search for a film">
+    You are taken to `busqueda.html` after onboarding. Type a film title into the search bar — for example, **Midsommar**. The backend queries the TMDB API to return matching results with posters, ratings, and release years.
+  </Step>
+
+  <Step title="View the AI analysis">
+    Select a film from the results to open `analisis.html`. Magic Film automatically classifies the film as either **Entertainment** or **Deep** and displays the corresponding analysis layers.
+
+    - Entertainment films show: spoiler-free summary, epic moments, easter eggs, and production trivia.
+    - Deep/arthouse films show: narrative analysis, visual symbolism, cultural context, technical craft, and conclusion.
+
+    See [Analysis modes](/features/analysis-modes) for a full breakdown of each layer.
+  </Step>
+</Steps>
+
+## Pages in the application
+
+The frontend is composed of the following HTML pages:
+
+| Page | File | Description |
+|------|------|-------------|
+| Home | `index.html` | Landing page and entry point |
+| Login | `login.html` | Returning user authentication |
+| Register | `registro.html` | New account creation |
+| Onboarding | `onboarding.html` | Cinephile level and genre preference setup |
+| Search | `busqueda.html` | Film search powered by TMDB |
+| Analysis | `analisis.html` | AI-generated analysis display |
+| Admin panel | `admin.html` | Film and analysis management (admin role only) |
+
+## User roles
+
+| Role | What you can do |
+|------|-----------------|
+| **Guest** | Search for films and view existing analyses |
+| **Registered** | Everything above, plus generate new analyses, save favorites, and receive personalized recommendations |
+| **Admin** | Full film management, analysis regeneration, and monitoring panel |
+
+<Tip>
+  Want to understand what happens under the hood after you search for a film? Read [How it works](/how-it-works) for the full classification and analysis pipeline.
+</Tip>

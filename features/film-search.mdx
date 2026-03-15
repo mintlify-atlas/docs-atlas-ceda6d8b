@@ -1,0 +1,100 @@
+---
+title: 'Film search'
+description: 'Search for any film by title and access AI-generated analyses powered by TMDB data.'
+keywords: ['search', 'TMDB', 'film', 'busqueda', 'movies']
+---
+
+Magic Film uses the [TMDB API v3](https://developer.themoviedb.org/docs) as its film data source. When you type a title into the search page, the backend queries TMDB, returns matching results, and lets you navigate directly to an analysis — without ever exposing the API key to the browser.
+
+## How search works
+
+<Steps>
+  <Step title="Type a film title">
+    Enter any film title in the search bar on the search page (`busqueda.html`). You can search in any language — TMDB supports multilingual queries.
+  </Step>
+  <Step title="Backend queries TMDB">
+    Your request is sent to the Magic Film backend, which calls the TMDB Search Movies endpoint (`/search/movie`) with your search term. The frontend never communicates directly with TMDB.
+  </Step>
+  <Step title="Results are returned">
+    TMDB returns a ranked list of matching films. Magic Film surfaces the following fields for each result:
+
+    | Field | Source |
+    |---|---|
+    | `titulo` | `title` from TMDB |
+    | `titulo_original` | `original_title` from TMDB |
+    | `anio` | Derived from `release_date` |
+    | `poster_url` | `poster_path` from TMDB image CDN |
+    | `calificacion` | `vote_average` (0–10 scale) |
+    | `keywords` | Fetched from TMDB keywords endpoint |
+    | Genres | From TMDB genre IDs, mapped to the local `generos` table |
+  </Step>
+  <Step title="Select a film">
+    Click any result to open the film detail view. If an analysis already exists in the database, it loads instantly. If not, you can trigger one (registered users only).
+  </Step>
+</Steps>
+
+## Guest vs. registered access
+
+<Tabs>
+  <Tab title="Guest (invitado)">
+    As a guest, you can:
+
+    - Search for any film by title
+    - Browse search results with poster, year, rating, and genres
+    - View analyses that have already been generated and saved
+
+    You cannot trigger a new AI analysis or save films to your favorites list.
+
+    <Note>
+      No account is required to search or read existing analyses. Guest access is fully public.
+    </Note>
+  </Tab>
+  <Tab title="Registered (registrado)">
+    Registered users get everything guests have, plus:
+
+    - The ability to generate a new analysis for films that don't have one yet
+    - Saving films to a personal favorites list
+    - Personalized film recommendations based on your cinephile profile and preferred genres
+    - Search history stored in `historial_busquedas` for future reference
+  </Tab>
+</Tabs>
+
+## Search flow diagram
+
+```
+You type "Midsommar"
+        ↓
+Frontend → POST /api/peliculas/buscar
+        ↓
+Backend → TMDB /search/movie?query=Midsommar
+        ↓
+Results returned: title, year, poster, rating, genres
+        ↓
+You select a film
+        ↓
+┌─ Analysis exists in DB? ─────────────────────────┐
+│  YES → Return saved analysis immediately         │
+│  NO  → Registered user triggers AI generation   │
+└──────────────────────────────────────────────────┘
+```
+
+## Data returned per film
+
+The `peliculas` table stores the enriched film record after a TMDB lookup. The fields available on every search result are:
+
+```sql
+SELECT
+  tmdb_id,
+  titulo,
+  titulo_original,
+  anio,
+  calificacion,      -- DECIMAL(3,1), range 0–10
+  poster_url,
+  keywords,          -- JSON array of TMDB keyword objects
+  tipo_analisis      -- 'entretenimiento' | 'profundo' (auto-classified)
+FROM peliculas;
+```
+
+<Info>
+  The `tipo_analisis` field is automatically assigned by Magic Film's internal classifier when a film is first fetched from TMDB. It determines which analysis mode — Entertainment or Deep — will be used when generating content. See [Analysis modes](/features/analysis-modes) for details.
+</Info>

@@ -1,0 +1,124 @@
+---
+title: 'Generate analysis'
+description: 'Trigger AI-powered cinematic analysis for a film using the Gemini model.'
+api: 'POST /api/analisis/generar'
+---
+
+Requests an AI-generated analysis for the specified film. The API checks for a cached result first. If a complete analysis already exists, it is returned immediately. Otherwise, the analysis is generated using **Gemini 1.5 Flash** and stored for future requests.
+
+<Warning>
+  Authentication is required. The request must include a valid JWT for a `registrado` or `admin` user.
+</Warning>
+
+<Note>
+  **Caching behavior:** Each film has at most one analysis record (enforced by a `UNIQUE` constraint on `pelicula_id` in the `analisis` table). If an analysis with `estado = 'completo'` already exists for the requested film, the API returns the cached result without calling Gemini. A new Gemini call is only made when no record exists, the existing record has `estado = 'error'`, or an admin explicitly regenerates via [POST /api/admin/analisis/regenerar/:id](/api/admin/overview).
+</Note>
+
+## Headers
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <token>` — JWT obtained from [POST /api/auth/login](/api/auth/login).
+</ParamField>
+
+## Request body
+
+<ParamField body="peliculaId" type="number" required>
+  The internal Magic Film ID of the film to analyse. Must correspond to an existing record in the `peliculas` table.
+</ParamField>
+
+## Response
+
+<ResponseField name="analisis" type="object" required>
+  <Expandable title="properties" defaultOpen={true}>
+    <ResponseField name="id" type="number">
+      Internal analysis ID.
+    </ResponseField>
+    <ResponseField name="pelicula_id" type="number">
+      The film this analysis belongs to.
+    </ResponseField>
+    <ResponseField name="tipo" type="string">
+      Analysis depth. One of `entretenimiento` or `profundo`, inherited from the film's `tipo_analisis` setting.
+    </ResponseField>
+    <ResponseField name="modelo_ia" type="string">
+      The AI model used to generate this analysis. Defaults to `gemini-1.5-flash`.
+    </ResponseField>
+    <ResponseField name="estado" type="string">
+      Generation status. One of `pendiente`, `generando`, `completo`, or `error`.
+    </ResponseField>
+    <ResponseField name="idioma" type="string">
+      Language of the generated content. Defaults to `es` (Spanish).
+    </ResponseField>
+    <ResponseField name="generado_en" type="string">
+      ISO 8601 timestamp of initial generation.
+    </ResponseField>
+    <ResponseField name="actualizado_en" type="string">
+      ISO 8601 timestamp of last update.
+    </ResponseField>
+    <ResponseField name="capas" type="object[]">
+      Array of analysis layers. See [GET /api/analisis/:peliculaId](/api/analysis/get) for full field documentation.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<RequestExample>
+
+```bash cURL
+curl --request POST \
+  --url http://localhost:3000/api/analisis/generar \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "peliculaId": 1
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "analisis": {
+    "id": 7,
+    "pelicula_id": 1,
+    "tipo": "profundo",
+    "modelo_ia": "gemini-1.5-flash",
+    "estado": "completo",
+    "idioma": "es",
+    "generado_en": "2026-03-14T20:00:00.000Z",
+    "actualizado_en": "2026-03-14T20:01:45.000Z",
+    "capas": [
+      {
+        "id": 31,
+        "nombre_capa": "resumen",
+        "modo": "profundo",
+        "contenido": "Inception explora los límites de la mente subconsciente...",
+        "orden": 1
+      }
+    ]
+  }
+}
+```
+
+```json 401
+{
+  "error": "Token no proporcionado o inválido."
+}
+```
+
+```json 404
+{
+  "error": "Película no encontrada."
+}
+```
+
+```json 202
+{
+  "mensaje": "El análisis se está generando. Vuelve a consultar en unos momentos.",
+  "estado": "generando"
+}
+```
+
+</ResponseExample>

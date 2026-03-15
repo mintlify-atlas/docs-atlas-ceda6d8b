@@ -1,0 +1,71 @@
+---
+title: "Magic Film"
+description: "AI-powered adaptive cinematic analysis — understand the true meaning of film."
+---
+
+Magic Film is a web platform that generates **personalized cinematic analysis using artificial intelligence**. Unlike IMDb or Letterboxd — which show user-written reviews with inconsistent quality — Magic Film produces its own structured analysis tailored to the character of each film.
+
+The system automatically detects whether a film is **mass entertainment** or **auteur cinema**, and generates a completely different analysis for each case. All analysis is delivered in Spanish, organized in thematic layers, and cached in the database to avoid repeating work.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running with Magic Film in minutes
+  </Card>
+  <Card title="How it works" icon="circle-info" href="/how-it-works">
+    Understand the AI classification and analysis pipeline
+  </Card>
+  <Card title="Analysis modes" icon="film" href="/features/analysis-modes">
+    Deep vs. Entertainment — two analysis formats explained
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/register">
+    Explore the full REST API for Magic Film
+  </Card>
+</CardGroup>
+
+## What makes Magic Film different
+
+<CardGroup cols={2}>
+  <Card title="Adaptive AI analysis" icon="brain">
+    Films are automatically classified as Entertainment or Deep/Arthouse. The AI generates a completely different analysis structure for each type.
+  </Card>
+  <Card title="Powered by Google Gemini" icon="sparkles">
+    Uses Gemini 1.5 Flash to produce structured, layered cinematic analysis — not generic summaries.
+  </Card>
+  <Card title="Real film data via TMDB" icon="database">
+    Film metadata, genres, keywords, posters, and ratings come directly from The Movie Database API v3.
+  </Card>
+  <Card title="Smart caching" icon="bolt">
+    Generated analyses are stored in MySQL. Repeat requests are served instantly — no AI calls, no cost.
+  </Card>
+  <Card title="Role-based access" icon="shield">
+    Three user tiers: Guest (browse), Registered (generate & save), and Admin (full management panel).
+  </Card>
+  <Card title="Favorites & history" icon="heart">
+    Registered users can save favorite films and access their full search history.
+  </Card>
+</CardGroup>
+
+## Analysis types
+
+| Mode | Target films | Generated content |
+|------|-------------|-------------------|
+| **Entertainment** | Blockbusters, comedies, franchises | Spoiler-free summary · Epic moments · Easter eggs · Production trivia |
+| **Deep** | Auteur films, dramas, folk horror | Visual symbolism · Themes · Cultural context · Director analysis |
+
+## Project status
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | UI/UX design | Completed |
+| 2 | Interactive HTML/CSS/JS mockup | Completed |
+| 3 | Registration, login, and profile setup flow | Completed |
+| 4 | Node.js + Express backend | In progress |
+| 5 | TMDB API integration | Pending |
+| 6 | Google Gemini API integration | Pending |
+| 7 | MySQL database | Pending |
+| 8 | Frontend ↔ backend connection | Pending |
+| 9 | Testing and deployment | Pending |
+
+<Note>
+Magic Film is currently in active development (v0.1 mockup). The frontend UI is complete and the backend architecture is defined. API integrations are pending.
+</Note>

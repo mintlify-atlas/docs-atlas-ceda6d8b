@@ -1,0 +1,204 @@
+---
+title: 'Admin API'
+description: 'Administrative endpoints for managing films and AI analyses. Requires the admin role.'
+---
+
+<Warning>
+  All endpoints on this page require authentication **and** the `admin` role. Requests from users with `rol = 'registrado'` or `rol = 'invitado'` are rejected with `403`. Every admin action is recorded in the `historial_admin` table.
+</Warning>
+
+---
+
+## List all films
+
+`GET /api/admin/peliculas`
+
+Returns every record in the `peliculas` table, including inactive films (`activa = false`). Intended for catalogue management in the admin dashboard.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <token>` — JWT for a user with `rol = 'admin'`.
+</ParamField>
+
+### Response
+
+<ResponseField name="peliculas" type="object[]" required>
+  <Expandable title="Film object properties" defaultOpen={true}>
+    <ResponseField name="id" type="number">
+      Internal Magic Film ID.
+    </ResponseField>
+    <ResponseField name="tmdb_id" type="number">
+      TMDB identifier.
+    </ResponseField>
+    <ResponseField name="titulo" type="string">
+      Localised title.
+    </ResponseField>
+    <ResponseField name="titulo_original" type="string">
+      Original-language title.
+    </ResponseField>
+    <ResponseField name="anio" type="number">
+      Release year.
+    </ResponseField>
+    <ResponseField name="director" type="string">
+      Director name.
+    </ResponseField>
+    <ResponseField name="duracion_min" type="number">
+      Runtime in minutes.
+    </ResponseField>
+    <ResponseField name="calificacion" type="number">
+      Average rating (0–10).
+    </ResponseField>
+    <ResponseField name="tipo_analisis" type="string">
+      Default analysis depth. One of `entretenimiento` or `profundo`.
+    </ResponseField>
+    <ResponseField name="tipo_forzado" type="boolean">
+      Whether `tipo_analisis` was overridden by an admin.
+    </ResponseField>
+    <ResponseField name="activa" type="boolean">
+      Whether the film is visible to regular users.
+    </ResponseField>
+    <ResponseField name="creado_en" type="string">
+      ISO 8601 timestamp of record creation.
+    </ResponseField>
+    <ResponseField name="actualizado_en" type="string">
+      ISO 8601 timestamp of last update.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL — list all films
+curl --request GET \
+  --url http://localhost:3000/api/admin/peliculas \
+  --header 'Authorization: Bearer <your-admin-token>'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "peliculas": [
+    {
+      "id": 1,
+      "tmdb_id": 27205,
+      "titulo": "Inception",
+      "titulo_original": "Inception",
+      "anio": 2010,
+      "director": "Christopher Nolan",
+      "duracion_min": 148,
+      "calificacion": 8.4,
+      "tipo_analisis": "profundo",
+      "tipo_forzado": false,
+      "activa": true,
+      "creado_en": "2026-03-01T08:00:00.000Z",
+      "actualizado_en": "2026-03-10T12:30:00.000Z"
+    }
+  ]
+}
+```
+
+```json 403
+{
+  "error": "Acceso denegado. Se requiere el rol admin."
+}
+```
+
+</ResponseExample>
+
+---
+
+## Force-regenerate analysis
+
+`POST /api/admin/analisis/regenerar/:id`
+
+Forces the AI to regenerate the analysis for the specified film, bypassing the cache. The existing `analisis` record is updated in place. The action is logged to `historial_admin` with `accion = 'regenerar_ia'`.
+
+<Note>
+  This endpoint uses the film's `id` (not the `analisis.id`) to locate the record. The new analysis is generated with the same `tipo_analisis` currently set on the film.
+</Note>
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <token>` — JWT for a user with `rol = 'admin'`.
+</ParamField>
+
+### Path parameters
+
+<ParamField path="id" type="number" required>
+  The internal Magic Film ID of the film whose analysis should be regenerated.
+</ParamField>
+
+### Admin audit log
+
+Every call to this endpoint writes a row to `historial_admin`:
+
+| Column | Value |
+|---|---|
+| `admin_id` | ID of the admin who made the request |
+| `accion` | `regenerar_ia` |
+| `entidad` | `analisis` |
+| `entidad_id` | ID of the affected `analisis` record |
+| `detalle` | Human-readable description of the action |
+| `realizado_en` | Timestamp of the action |
+
+### Response
+
+<ResponseField name="analisis" type="object" required>
+  The updated analysis object. Structure is identical to the response from [GET /api/analisis/:peliculaId](/api/analysis/get).
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL — force-regenerate analysis
+curl --request POST \
+  --url http://localhost:3000/api/admin/analisis/regenerar/1 \
+  --header 'Authorization: Bearer <your-admin-token>'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "analisis": {
+    "id": 7,
+    "pelicula_id": 1,
+    "tipo": "profundo",
+    "modelo_ia": "gemini-1.5-flash",
+    "estado": "completo",
+    "idioma": "es",
+    "eliminado": false,
+    "generado_en": "2026-03-15T14:00:00.000Z",
+    "actualizado_en": "2026-03-15T14:02:10.000Z",
+    "capas": [
+      {
+        "id": 31,
+        "nombre_capa": "resumen",
+        "modo": "profundo",
+        "contenido": "Análisis regenerado: Inception explora...",
+        "orden": 1
+      }
+    ]
+  }
+}
+```
+
+```json 403
+{
+  "error": "Acceso denegado. Se requiere el rol admin."
+}
+```
+
+```json 404
+{
+  "error": "Película no encontrada."
+}
+```
+
+</ResponseExample>

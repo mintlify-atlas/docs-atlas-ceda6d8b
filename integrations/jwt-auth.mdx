@@ -1,0 +1,103 @@
+---
+title: "JWT authentication"
+description: "How Magic Film authenticates users and protects routes using JSON Web Tokens."
+---
+
+## Overview
+
+Magic Film uses [JSON Web Tokens (JWT)](https://jwt.io) for stateless authentication. When a user logs in, the backend issues a signed JWT. The client includes this token in every subsequent request to access protected routes. The server verifies the token's signature without hitting the database on every request.
+
+## Configuration
+
+<ParamField path="JWT_SECRET" type="string" required>
+  The secret key used to sign and verify tokens. Use a long, random string — at least 32 characters. Anyone who knows this value can forge valid tokens.
+</ParamField>
+
+<ParamField path="JWT_EXPIRES_IN" type="string" default="7d">
+  How long tokens remain valid after issuance. The default is `7d` (seven days). Accepted formats: `7d`, `24h`, `3600` (seconds).
+</ParamField>
+
+Set both in your `.env` file:
+
+```bash
+JWT_SECRET=your_strong_random_secret_here
+JWT_EXPIRES_IN=7d
+```
+
+## Authentication flow
+
+<Steps>
+  <Step title="User logs in">
+    The client sends the user's credentials (email and password) to the login endpoint.
+
+    ```bash
+    POST /api/auth/login
+    Content-Type: application/json
+
+    { "email": "user@example.com", "password": "secret" }
+    ```
+  </Step>
+
+  <Step title="Backend issues a JWT">
+    If the credentials are valid, the backend signs a JWT containing the user's `id` and `rol`, then returns it in the response body.
+
+    ```json
+    {
+      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+      "expiresIn": "7d"
+    }
+    ```
+  </Step>
+
+  <Step title="Client stores the token">
+    The frontend stores the token (typically in `localStorage` or a session store) and attaches it to every subsequent API request.
+  </Step>
+
+  <Step title="Client includes token in requests">
+    Protected endpoints require the token in the `Authorization` header using the `Bearer` scheme.
+
+    ```bash
+    GET /api/peliculas/123/analisis
+    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    ```
+  </Step>
+
+  <Step title="Backend verifies the token">
+    The `authMiddleware` extracts the token from the `Authorization` header, verifies its signature using `JWT_SECRET`, checks that it has not expired, and attaches the decoded user payload to `req.user`. If verification fails, the middleware returns `401 Unauthorized`.
+  </Step>
+</Steps>
+
+## Middleware
+
+### authMiddleware
+
+The `authMiddleware` (`backend/middlewares/authMiddleware.js`) protects routes that require a logged-in user. Apply it to any route or router that should be inaccessible without a valid token.
+
+Behavior:
+- Reads the `Authorization: Bearer <token>` header.
+- Verifies the JWT signature against `JWT_SECRET`.
+- Checks the token expiry (`JWT_EXPIRES_IN`).
+- On success: attaches the decoded payload to `req.user` and calls `next()`.
+- On failure: returns `401 Unauthorized` with an error message.
+
+### adminOnly
+
+The `adminOnly` middleware (`backend/middlewares/`) restricts routes to users whose `rol` is `admin`. It must be applied **after** `authMiddleware`, because it reads from `req.user` which `authMiddleware` populates.
+
+The three user roles defined in the `usuarios` table are:
+
+| Role | Access |
+|---|---|
+| `invitado` | Browse films and view existing analyses |
+| `registrado` | Generate analyses, save favourites, personalised recommendations |
+| `admin` | Full film management, regenerate analyses, monitoring panel |
+
+## Security recommendations
+
+<Warning>
+  Use a strong, unpredictable value for `JWT_SECRET`. A weak or guessable secret allows attackers to forge tokens and impersonate any user, including admins. Generate it with a tool like `openssl rand -hex 32`.
+</Warning>
+
+- Never log or expose `JWT_SECRET` in error messages or responses.
+- Set `JWT_EXPIRES_IN` to the shortest practical duration for your use case.
+- If you rotate `JWT_SECRET`, all existing tokens become invalid immediately — users will need to log in again.

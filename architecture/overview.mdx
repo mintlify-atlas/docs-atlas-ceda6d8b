@@ -1,0 +1,141 @@
+---
+title: "Architecture overview"
+description: "How Magic Film's 3-layer MVC architecture connects the frontend, backend REST API, and external services."
+keywords: ["architecture", "MVC", "backend", "frontend", "middleware", "REST API"]
+---
+
+Magic Film follows a **3-layer MVC architecture**. The frontend never communicates directly with TMDB or Google Gemini — every request passes through the backend, keeping all API keys server-side and out of the browser.
+
+```
+Client (HTML/CSS/JS)  →  Backend REST API (Node.js/Express)  →  MySQL + External APIs
+```
+
+<CardGroup cols={3}>
+  <Card title="Layer 1 — Frontend" icon="monitor">
+    Static HTML5, CSS3, and JavaScript ES6+. Renders UI and sends all data requests to the backend via `fetch`. Never holds API keys.
+  </Card>
+  <Card title="Layer 2 — Backend" icon="server">
+    Node.js + Express REST API. Owns the business logic, authentication, AI classification, and all calls to TMDB and Gemini.
+  </Card>
+  <Card title="Layer 3 — Data" icon="database">
+    MySQL database (`magic_filmv01`) stores users, films, AI analyses, favourites, and audit logs. External APIs (TMDB, Gemini) are called only when no cached result exists.
+  </Card>
+</CardGroup>
+
+## Why the frontend never calls TMDB or Gemini directly
+
+Both TMDB and Google Gemini require secret API keys. If the frontend called those APIs directly, the keys would be visible in browser network traffic and JavaScript bundles — anyone could extract them and run up charges on your account.
+
+By routing every external call through the backend you get:
+
+- **Key protection** — `TMDB_API_KEY` and `GEMINI_API_KEY` live only in `.env` on the server.
+- **Response caching** — the backend checks MySQL before calling Gemini; if an analysis already exists it returns it immediately at zero AI cost.
+- **Access control** — the server enforces authentication and role checks before forwarding any request.
+
+## Project directory tree
+
+```
+magic-film/
+├── backend/
+│   ├── config/          → DB connection and environment variable loader
+│   ├── controllers/     → Business logic per entity
+│   ├── models/          → Database access (SQL queries)
+│   ├── routes/          → REST endpoint definitions
+│   ├── middlewares/     → authMiddleware, adminOnly, validarInput
+│   ├── services/        → TMDB, Gemini, and classifier integrations
+│   ├── utils/           → Reusable helpers (errorHandler, responseHelper)
+│   └── server.js        → Server entry point
+│
+├── frontend/
+│   ├── pages/           → HTML files
+│   ├── css/
+│   │   ├── variables.css
+│   │   ├── global.css
+│   │   ├── components/
+│   │   └── pages/
+│   ├── js/
+│   │   ├── api/         → fetch calls to the backend
+│   │   ├── components/
+│   │   └── pages/
+│   └── assets/          → Images and icons
+│
+├── database/
+│   ├── schema.sql
+│   ├── seeds/
+│   └── MER/
+│
+├── docs/
+│   └── Documentacion-Magic-Film.pdf
+│
+├── .env.example
+├── package.json
+└── README.md
+```
+
+## Request flow
+
+The following diagram traces a film search from browser to database and back.
+
+```
+User types "Midsommar" in the search bar
+        ↓
+Frontend sends GET /api/search?q=Midsommar  (fetch, no API keys)
+        ↓
+[ authMiddleware ]  →  validates JWT token from Authorization header
+        ↓
+[ validarInput ]    →  sanitises and validates query parameters
+        ↓
+Backend queries TMDB API  →  retrieves genres, keywords, metadata
+        ↓
+Internal classifier  →  PROFUNDO or ENTRETENIMIENTO
+        ↓
+Check MySQL: does an analysis already exist for this film?
+   ├── YES  →  return cached analysis  (fast, zero AI cost)
+   └── NO   →  call Google Gemini API  →  save to DB  →  return
+        ↓
+Backend sends JSON response
+        ↓
+Frontend renders the analysis screens
+```
+
+## Middleware chain
+
+Every protected route passes through one or more middleware functions before reaching the controller. They run in the order listed below.
+
+<Steps>
+  <Step title="authMiddleware">
+    Reads the `Authorization: Bearer <token>` header, verifies the JWT signature against `JWT_SECRET`, and attaches the decoded user object to `req.user`. Returns `401 Unauthorized` if the token is missing, expired, or invalid.
+  </Step>
+  <Step title="adminOnly">
+    Checks that `req.user.rol === 'admin'`. Returns `403 Forbidden` for any user whose role is `invitado` or `registrado`. Applied only to admin routes such as analysis regeneration and the monitoring panel.
+  </Step>
+  <Step title="validarInput">
+    Sanitises and validates incoming request parameters and body fields before they reach the controller. Rejects malformed or missing required values early, keeping controllers clean.
+  </Step>
+</Steps>
+
+<Info>
+  Guest users (role `invitado`) can search for films and read existing analyses without a token. The `authMiddleware` is only applied to routes that require an authenticated session.
+</Info>
+
+## Backend utilities
+
+The `backend/utils/` directory exposes two helpers used throughout the codebase:
+
+| Utility | File | Purpose |
+|---|---|---|
+| Error handler | `errorHandler.js` | Centralises error formatting so all error responses share a consistent JSON shape |
+| Response helper | `responseHelper.js` | Wraps successful payloads in a standard envelope before sending them to the client |
+
+## Configuration
+
+The `backend/config/` directory contains two modules:
+
+| Module | File | Purpose |
+|---|---|---|
+| Database | `db.js` | Creates and exports the MySQL connection pool using credentials from environment variables |
+| Environment | `env.js` | Loads and validates all required environment variables at startup, failing fast if any are missing |
+
+<Tip>
+  Copy `.env.example` to `.env` and fill in your own values before starting the server. The application will refuse to start if required variables such as `TMDB_API_KEY`, `GEMINI_API_KEY`, or `JWT_SECRET` are absent.
+</Tip>

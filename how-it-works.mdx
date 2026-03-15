@@ -1,0 +1,144 @@
+---
+title: "How it works"
+description: "The full pipeline behind Magic Film — from a user's search to a cached, structured AI cinematic analysis."
+---
+
+When you search for a film, Magic Film runs a multi-step pipeline that classifies the film, checks for a cached result, and only calls the AI when necessary. This keeps responses fast and eliminates redundant AI requests.
+
+## The analysis pipeline
+
+```
+User searches for "Midsommar"
+        ↓
+Frontend sends the search to the backend
+        ↓
+Backend queries TMDB → retrieves genres, keywords, and metadata
+        ↓
+Internal classifier → PROFUNDO or ENTRETENIMIENTO
+        ↓
+Does an analysis already exist in the database?
+   ├── YES → return the stored result  (fast, no cost)
+   └── NO  → call Google Gemini → save to DB → return result
+        ↓
+Frontend renders the analysis screens
+```
+
+### Step 1 — TMDB lookup
+
+The backend calls the [TMDB API v3](https://www.themoviedb.org/settings/api) using your `TMDB_API_KEY`. It retrieves:
+
+- Title, original title, release year, and runtime
+- Synopsis, budget, revenue, and rating
+- Genre list and keyword tags
+- Poster URL
+
+This data is stored in the `peliculas` table and the `catalogo_peliculas` manager table, which centralizes search and listing queries.
+
+### Step 2 — Classification
+
+The internal classifier reads the genres and keywords returned by TMDB and assigns one of two modes to the film:
+
+| Mode value | Applies to |
+|------------|------------|
+| `entretenimiento` | Blockbusters, comedies, action franchises, mainstream genre films |
+| `profundo` | Auteur cinema, psychological dramas, folk horror, art-house films |
+
+The classification is stored in the `tipo_analisis` column on the `peliculas` table. An admin can override it by setting `tipo_forzado = TRUE`.
+
+### Step 3 — Cache check
+
+Before calling the AI, the backend checks the `analisis` table for an existing record linked to the film's `pelicula_id`. The `estado` column tracks the record lifecycle:
+
+| `estado` value | Meaning |
+|----------------|---------|
+| `pendiente` | Analysis has not started |
+| `generando` | Gemini call is in progress |
+| `completo` | Analysis is ready to serve |
+| `error` | Generation failed |
+
+If a `completo` record exists, the stored content layers are returned immediately — no AI call is made.
+
+### Step 4 — Gemini generation (cache miss only)
+
+On a cache miss, the backend calls [Google Gemini 1.5 Flash](https://aistudio.google.com) (`GEMINI_MODEL=gemini-1.5-flash`) with a structured prompt built from the film's TMDB data. The model generates the content layers appropriate for the film's classification mode.
+
+The raw response is split into individual layers and written to the `capas_analisis` table. The `log_ia` table records the prompt, estimated token count, and generation time in milliseconds for every call.
+
+### Step 5 — Response delivery
+
+The frontend renders `analisis.html` with the content layers. Whether the result came from cache or a fresh Gemini call, the response structure is identical.
+
+---
+
+## Analysis modes and content layers
+
+Each mode produces a distinct set of named content layers (`nombre_capa`) stored in the `capas_analisis` table.
+
+<Tabs>
+  <Tab title="Entertainment">
+    Applied to blockbusters, comedies, and mainstream genre films.
+
+    | Layer (`nombre_capa`) | Description |
+    |-----------------------|-------------|
+    | `resumen` | Spoiler-free summary of the film |
+    | `momentos` | Standout epic or memorable moments |
+    | `easter_eggs` | Hidden references and in-jokes |
+    | `curiosidades` | Behind-the-scenes production trivia |
+
+    Layers are ordered and stored with an `orden` column. Each `(analisis_id, nombre_capa)` pair is unique — a film can only have one instance of each layer.
+  </Tab>
+  <Tab title="Deep">
+    Applied to auteur films, psychological dramas, and arthouse cinema.
+
+    | Layer (`nombre_capa`) | Description |
+    |-----------------------|-------------|
+    | `narrativa` | Narrative structure and storytelling analysis |
+    | `simbolismo` | Visual symbolism and recurring motifs |
+    | `contexto` | Cultural, historical, and directorial context |
+    | `tecnica` | Technical craft — cinematography, sound, editing |
+    | `conclusion` | Synthesis and overall interpretation |
+
+    Deep analyses go beyond plot to examine the film as a work of art within its cultural and cinematic tradition.
+  </Tab>
+</Tabs>
+
+---
+
+## Caching mechanism
+
+Magic Film uses MySQL as its analysis cache. Once a `completo` analysis exists for a film, that result is served for all subsequent requests with no additional AI calls or cost.
+
+The relevant database tables are:
+
+| Table | Purpose |
+|-------|---------|
+| `analisis` | One record per film. Tracks mode, model used, status, and language. |
+| `capas_analisis` | Stores individual content layers for each analysis. |
+| `log_ia` | Records each Gemini call with prompt, token estimate, and duration. |
+
+All analyses are generated in Spanish (`idioma = 'es'`). The `modelo_ia` column defaults to `gemini-1.5-flash` and is recorded per analysis so future model changes are traceable.
+
+<Note>
+  Backend integrations — TMDB, Gemini, and MySQL — are still in development. The pipeline above reflects the planned architecture. See the [project status table](/introduction#project-status) for current progress.
+</Note>
+
+---
+
+## Architecture overview
+
+The frontend never communicates directly with TMDB or Gemini. All requests pass through the backend, keeping API keys server-side.
+
+```
+Client (HTML/CSS/JS)  →  Backend REST API (Node.js/Express)  →  MySQL + external APIs
+```
+
+The backend is organized into distinct layers:
+
+| Layer | Directory | Responsibility |
+|-------|-----------|----------------|
+| Controllers | `backend/controllers/` | Business logic per entity |
+| Models | `backend/models/` | SQL query access |
+| Routes | `backend/routes/` | REST endpoint definitions |
+| Middlewares | `backend/middlewares/` | Auth, admin-only, input validation |
+| Services | `backend/services/` | TMDB, Gemini, and classifier integrations |
+| Utils | `backend/utils/` | Shared error and response helpers |

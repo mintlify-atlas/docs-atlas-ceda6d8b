@@ -1,0 +1,125 @@
+---
+title: 'Register'
+description: 'Create a new Magic Film account and receive a JWT for subsequent requests.'
+api: 'POST /api/auth/register'
+---
+
+Creates a new user account. On success, returns the created user object and a signed JWT that can be used to authenticate future requests.
+
+<Info>
+  No authentication is required to call this endpoint.
+</Info>
+
+## Request body
+
+<ParamField body="nombre_usuario" type="string" required>
+  Unique username. Maximum 50 characters. Must not already be in use.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  User's email address. Maximum 150 characters. Must not already be in use.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  Plain-text password. The API stores only the bcrypt hash — never the raw value.
+</ParamField>
+
+<ParamField body="nombre_completo" type="string">
+  Optional display name. Maximum 100 characters.
+</ParamField>
+
+## Response
+
+<ResponseField name="token" type="string" required>
+  Signed JWT. Include this value in the `Authorization` header of subsequent requests.
+</ResponseField>
+
+<ResponseField name="usuario" type="object" required>
+  <Expandable title="properties" defaultOpen={true}>
+    <ResponseField name="id" type="number">
+      Auto-incremented internal user ID.
+    </ResponseField>
+    <ResponseField name="nombre_usuario" type="string">
+      The username supplied at registration.
+    </ResponseField>
+    <ResponseField name="email" type="string">
+      The email address supplied at registration.
+    </ResponseField>
+    <ResponseField name="nombre_completo" type="string">
+      Display name, or `null` if not provided.
+    </ResponseField>
+    <ResponseField name="rol" type="string">
+      Role assigned to the account. Defaults to `registrado`.
+    </ResponseField>
+    <ResponseField name="nivel_cinefilo" type="string">
+      Cinephile level. `null` until onboarding is completed. Possible values: `explorador`, `entusiasta`, `experto`.
+    </ResponseField>
+    <ResponseField name="onboarding_completo" type="boolean">
+      Whether the user has completed the onboarding flow. Defaults to `false`.
+    </ResponseField>
+    <ResponseField name="activo" type="boolean">
+      Whether the account is active. Defaults to `true`.
+    </ResponseField>
+    <ResponseField name="creado_en" type="string">
+      ISO 8601 timestamp of account creation.
+    </ResponseField>
+    <ResponseField name="actualizado_en" type="string">
+      ISO 8601 timestamp of last update.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+<RequestExample>
+
+```bash cURL
+curl --request POST \
+  --url http://localhost:3000/api/auth/register \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "nombre_usuario": "jdoe",
+    "email": "jdoe@example.com",
+    "password": "S3cur3P@ssw0rd",
+    "nombre_completo": "Jane Doe"
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 201
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "usuario": {
+    "id": 42,
+    "nombre_usuario": "jdoe",
+    "email": "jdoe@example.com",
+    "nombre_completo": "Jane Doe",
+    "rol": "registrado",
+    "nivel_cinefilo": null,
+    "onboarding_completo": false,
+    "activo": true,
+    "creado_en": "2026-03-15T10:00:00.000Z",
+    "actualizado_en": "2026-03-15T10:00:00.000Z"
+  }
+}
+```
+
+```json 409
+{
+  "error": "El nombre de usuario o email ya está en uso."
+}
+```
+
+```json 422
+{
+  "error": "Datos de entrada no válidos.",
+  "detalles": [
+    { "campo": "email", "mensaje": "Debe ser una dirección de correo válida." }
+  ]
+}
+```
+
+</ResponseExample>

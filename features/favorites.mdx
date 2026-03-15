@@ -1,0 +1,107 @@
+---
+title: 'Favorites'
+description: 'Save films to your personal favorites list and revisit them anytime from your profile.'
+keywords: ['favorites', 'favoritos', 'saved films', 'bookmarks', 'registered']
+---
+
+Favorites let you bookmark any film directly from its analysis or search result page. Your saved films are stored in the `favoritos` table and are accessible from your profile at any time.
+
+<Note>
+  Favorites require a registered account. Guests (`invitado`) cannot save films. If you try to add a favorite without being logged in, you will be prompted to register.
+</Note>
+
+## Database structure
+
+Each favorite is a row in the `favoritos` table that links a user to a film.
+
+```sql
+CREATE TABLE favoritos (
+  id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  usuario_id   INT UNSIGNED NOT NULL,
+  pelicula_id  INT UNSIGNED NOT NULL,
+  guardado_en  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_favorito (usuario_id, pelicula_id),
+  FOREIGN KEY (usuario_id)  REFERENCES usuarios(id)  ON DELETE CASCADE,
+  FOREIGN KEY (pelicula_id) REFERENCES peliculas(id) ON DELETE CASCADE
+);
+```
+
+The `UNIQUE KEY uq_favorito` constraint ensures you cannot save the same film twice. The `guardado_en` timestamp records when the film was added.
+
+A dedicated index (`idx_favoritos_usuario`) on `usuario_id` keeps favorites queries fast even as the table grows.
+
+## Adding a favorite
+
+Send an authenticated `POST` request with the film's ID in the request body.
+
+```http
+POST /api/usuarios/favoritos
+Authorization: Bearer <your-jwt-token>
+Content-Type: application/json
+
+{
+  "pelicula_id": 42
+}
+```
+
+A successful response returns the newly created favorite record:
+
+```json
+{
+  "id": 17,
+  "usuario_id": 5,
+  "pelicula_id": 42,
+  "guardado_en": "2026-03-15T14:22:00.000Z"
+}
+```
+
+If the film is already in your favorites, the `UNIQUE KEY` constraint on `(usuario_id, pelicula_id)` prevents duplicates and the API returns an appropriate error.
+
+## Removing a favorite
+
+Send an authenticated `DELETE` request with the film's ID as a URL parameter.
+
+```http
+DELETE /api/usuarios/favoritos/:peliculaId
+Authorization: Bearer <your-jwt-token>
+```
+
+For example, to remove the film with ID `42`:
+
+```http
+DELETE /api/usuarios/favoritos/42
+Authorization: Bearer <your-jwt-token>
+```
+
+A `204 No Content` response confirms the favorite was removed. The row is hard-deleted from the `favoritos` table.
+
+## Favorites workflow
+
+<Steps>
+  <Step title="Search for a film">
+    Use the search page to find the film you want to save. See [Film search](/features/film-search) for details.
+  </Step>
+  <Step title="Open the analysis page">
+    Select the film from the search results to open its analysis view (`analisis.html`).
+  </Step>
+  <Step title="Save to favorites">
+    Click the favorites button on the analysis page. This triggers a `POST /api/usuarios/favoritos` request with the current film's ID. The button state updates immediately to reflect the saved status.
+  </Step>
+  <Step title="View your favorites">
+    Access your saved films from your profile. Each entry shows the film title, poster, year, and the date you saved it (`guardado_en`).
+  </Step>
+  <Step title="Remove a favorite">
+    Click the favorites button again on any saved film to remove it. This triggers a `DELETE /api/usuarios/favoritos/:peliculaId` request.
+  </Step>
+</Steps>
+
+## API endpoints summary
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/usuarios/favoritos` | Add a film to your favorites |
+| `DELETE` | `/api/usuarios/favoritos/:peliculaId` | Remove a film from your favorites |
+
+<Info>
+  Both endpoints require a valid JWT in the `Authorization` header. Requests without a token, or with a token belonging to a guest account, will be rejected by `authMiddleware`.
+</Info>

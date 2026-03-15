@@ -1,0 +1,76 @@
+---
+title: "TMDB integration"
+description: "How Magic Film uses The Movie Database API to fetch film metadata."
+---
+
+## What is TMDB?
+
+[The Movie Database (TMDB)](https://www.themoviedb.org) is a community-built movie and TV database with a free REST API (v3). Magic Film uses TMDB as its primary source of film data — titles, release years, directors, runtimes, synopses, genres, keywords, poster images, ratings, budgets, and box-office figures all come from TMDB.
+
+## Why Magic Film uses TMDB
+
+Magic Film does not store a static film catalog. Instead, when a user searches for a movie, the backend queries TMDB in real time to retrieve up-to-date metadata. This data is then:
+
+1. Stored in the `peliculas` table for caching and future lookups.
+2. Passed to the internal classifier to determine whether the film should receive an `entretenimiento` (entertainment) or `profundo` (deep) analysis.
+3. Used to populate the `keywords` JSON column, which informs the Gemini prompt.
+
+## Architecture: backend-only
+
+The frontend never calls TMDB directly. Every TMDB request originates from the backend, which keeps the `TMDB_API_KEY` secret and gives the backend full control over what data is stored and returned.
+
+```
+User search
+    ↓
+Frontend → Backend (Node.js/Express)
+    ↓
+Backend → TMDB API v3
+    ↓
+Backend stores result in MySQL → returns to Frontend
+```
+
+## Configuration
+
+| Variable | Value |
+|---|---|
+| `TMDB_BASE_URL` | `https://api.themoviedb.org/3` |
+| `TMDB_API_KEY` | Your personal API key |
+
+Set both variables in your `.env` file. See [Environment variables](/setup/environment-variables) for details.
+
+## Getting an API key
+
+<Steps>
+  <Step title="Create a TMDB account">
+    Go to [themoviedb.org](https://www.themoviedb.org) and register for a free account.
+  </Step>
+  <Step title="Request an API key">
+    Visit [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api) and request a **v3 auth** key. For a personal or development project, select the "Developer" option.
+  </Step>
+  <Step title="Copy the key into your .env">
+    Paste the key as the value of `TMDB_API_KEY` in your `.env` file.
+
+    ```bash
+    TMDB_API_KEY=your_tmdb_v3_key_here
+    TMDB_BASE_URL=https://api.themoviedb.org/3
+    ```
+  </Step>
+</Steps>
+
+## Data fetched from TMDB
+
+| Field | TMDB source | Stored in |
+|---|---|---|
+| Title and original title | Movie details endpoint | `peliculas.titulo`, `peliculas.titulo_original` |
+| Release year | `release_date` | `peliculas.anio` |
+| Runtime | `runtime` | `peliculas.duracion_min` |
+| Synopsis | `overview` | `peliculas.sinopsis` |
+| Genres | `genres` array | `generos` + `pelicula_generos` |
+| Keywords | Keywords endpoint | `peliculas.keywords` (JSON) |
+| Poster image | `poster_path` | `peliculas.poster_url` |
+| Rating | `vote_average` | `peliculas.calificacion` |
+| Budget and revenue | `budget`, `revenue` | `peliculas.presupuesto`, `peliculas.recaudacion` |
+
+<Note>
+  TMDB poster paths are relative (e.g., `/abc123.jpg`). The full image URL is constructed by prepending the TMDB image CDN base URL: `https://image.tmdb.org/t/p/w500`.
+</Note>

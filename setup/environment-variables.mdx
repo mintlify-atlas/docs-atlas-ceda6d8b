@@ -1,0 +1,98 @@
+---
+title: "Environment variables"
+description: "Reference for every environment variable used by Magic Film."
+---
+
+Magic Film reads its configuration from a `.env` file in the project root. Copy `.env.example` to `.env` and set each variable before starting the server.
+
+<Warning>
+  Never commit your `.env` file to git. It contains your database password, API keys, and JWT secret. The repository already includes `.env.example` as a safe template — `.env` should remain local only.
+</Warning>
+
+## Full .env.example
+
+```bash
+# ── SERVIDOR ──────────────────────────────────
+PORT=3000
+NODE_ENV=development
+
+# ── BASE DE DATOS ──────────────────────────────
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=magic_film
+DB_USER=root
+DB_PASSWORD=password_aqui
+
+# ── APIS EXTERNAS ──────────────────────────────
+# La Api se obtiene en: https://www.themoviedb.org/settings/api
+TMDB_API_KEY=clave_tmdb_aqui
+TMDB_BASE_URL=https://api.themoviedb.org/3
+
+# La Api se obtiene en: https://aistudio.google.com
+GEMINI_API_KEY=clave_gemini_aqui
+GEMINI_MODEL=gemini-1.5-flash
+
+# ── SEGURIDAD ──────────────────────────────────
+JWT_SECRET=your_strong_secret_here
+JWT_EXPIRES_IN=7d
+```
+
+## Server
+
+<ParamField path="PORT" type="number" default="3000">
+  The port the Express server listens on. Override this when running multiple services locally or when your hosting environment assigns a different port.
+</ParamField>
+
+<ParamField path="NODE_ENV" type="string" default="development">
+  The runtime environment. Accepted values are `development` and `production`. Setting this to `production` enables stricter error handling and disables verbose logging.
+</ParamField>
+
+## Database
+
+<ParamField path="DB_HOST" type="string" default="localhost">
+  Hostname or IP address of the MySQL server.
+</ParamField>
+
+<ParamField path="DB_PORT" type="number" default="3306">
+  Port the MySQL server listens on. The default MySQL port is `3306`.
+</ParamField>
+
+<ParamField path="DB_NAME" type="string" default="magic_film">
+  Name of the MySQL database to connect to. The schema creates a database named `magic_filmv01` — update this variable to match.
+</ParamField>
+
+<ParamField path="DB_USER" type="string" required>
+  MySQL user with read/write access to `DB_NAME`.
+</ParamField>
+
+<ParamField path="DB_PASSWORD" type="string" required>
+  Password for `DB_USER`.
+</ParamField>
+
+## External APIs
+
+<ParamField path="TMDB_API_KEY" type="string" required>
+  Your TMDB v3 API key. Obtain one at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api). This key is used exclusively by the backend — it is never exposed to the frontend.
+</ParamField>
+
+<ParamField path="TMDB_BASE_URL" type="string" default="https://api.themoviedb.org/3">
+  The base URL for all TMDB API requests. You do not need to change this unless TMDB changes its endpoint.
+</ParamField>
+
+<ParamField path="GEMINI_API_KEY" type="string" required>
+  Your Google Gemini API key. Obtain one at [aistudio.google.com](https://aistudio.google.com). Like `TMDB_API_KEY`, this is only used server-side.
+</ParamField>
+
+<ParamField path="GEMINI_MODEL" type="string" default="gemini-1.5-flash">
+  The Gemini model to use for cinematic analysis. Defaults to `gemini-1.5-flash`. Change this only if you want to experiment with a different model variant.
+</ParamField>
+
+## Security
+
+<ParamField path="JWT_SECRET" type="string" required>
+  The secret key used to sign and verify JSON Web Tokens. Use a long, random, unpredictable string in production. Rotating this value invalidates all existing sessions.
+</ParamField>
+
+<ParamField path="JWT_EXPIRES_IN" type="string" default="7d">
+  How long issued JWTs remain valid. Follows the [jsonwebtoken](https://github.com/auth0/node-jsonwebtoken#token-expiration-exp-claim) duration format (e.g., `7d`, `24h`, `3600`).
+</ParamField>

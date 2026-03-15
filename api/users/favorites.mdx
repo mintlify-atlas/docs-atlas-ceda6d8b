@@ -1,0 +1,146 @@
+---
+title: 'Favorites'
+description: "Add or remove films from the authenticated user's favorites list."
+---
+
+Two endpoints manage a user's favorites. Both require authentication.
+
+<Warning>
+  Both endpoints require a valid JWT. Requests without a token are rejected with `401`.
+</Warning>
+
+---
+
+## Add to favorites
+
+`POST /api/usuarios/favoritos`
+
+Adds a film to the authenticated user's favorites. The combination of `usuario_id` and `pelicula_id` is unique — adding the same film twice returns an error.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <token>` — JWT obtained from [POST /api/auth/login](/api/auth/login).
+</ParamField>
+
+### Request body
+
+<ParamField body="peliculaId" type="number" required>
+  The internal Magic Film ID of the film to add.
+</ParamField>
+
+### Response
+
+<ResponseField name="favorito" type="object" required>
+  <Expandable title="properties" defaultOpen={true}>
+    <ResponseField name="id" type="number">
+      Internal favorite record ID.
+    </ResponseField>
+    <ResponseField name="usuario_id" type="number">
+      ID of the user who saved the film.
+    </ResponseField>
+    <ResponseField name="pelicula_id" type="number">
+      ID of the saved film.
+    </ResponseField>
+    <ResponseField name="guardado_en" type="string">
+      ISO 8601 timestamp of when the film was saved.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL — add favorite
+curl --request POST \
+  --url http://localhost:3000/api/usuarios/favoritos \
+  --header 'Authorization: Bearer <your-token>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "peliculaId": 1
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 201
+{
+  "favorito": {
+    "id": 99,
+    "usuario_id": 42,
+    "pelicula_id": 1,
+    "guardado_en": "2026-03-15T11:00:00.000Z"
+  }
+}
+```
+
+```json 409
+{
+  "error": "Esta película ya está en tus favoritos."
+}
+```
+
+```json 404
+{
+  "error": "Película no encontrada."
+}
+```
+
+</ResponseExample>
+
+---
+
+## Remove from favorites
+
+`DELETE /api/usuarios/favoritos/:peliculaId`
+
+Removes a film from the authenticated user's favorites.
+
+### Headers
+
+<ParamField header="Authorization" type="string" required>
+  `Bearer <token>` — JWT obtained from [POST /api/auth/login](/api/auth/login).
+</ParamField>
+
+### Path parameters
+
+<ParamField path="peliculaId" type="number" required>
+  The internal Magic Film ID of the film to remove.
+</ParamField>
+
+### Response
+
+Returns a confirmation message on success. No body is returned on `204`.
+
+<RequestExample>
+
+```bash cURL — remove favorite
+curl --request DELETE \
+  --url http://localhost:3000/api/usuarios/favoritos/1 \
+  --header 'Authorization: Bearer <your-token>'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "mensaje": "Película eliminada de favoritos."
+}
+```
+
+```json 404
+{
+  "error": "Esta película no está en tus favoritos."
+}
+```
+
+```json 401
+{
+  "error": "Token no proporcionado o inválido."
+}
+```
+
+</ResponseExample>
