@@ -1,0 +1,134 @@
+{
+  "projectType": "saas",
+  "projectName": "Magic Film",
+  "projectDescription": "An AI-powered adaptive cinematic analysis platform that generates personalized deep-dive or entertainment-focused film analysis using Google Gemini and TMDB data.",
+  "theme": "almond",
+  "primaryColor": "#F5A623",
+  "lightColor": "#FFF3DC",
+  "darkColor": "#1A1A2E",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "how-it-works"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/film-search",
+              "features/analysis-modes",
+              "features/user-roles",
+              "features/favorites"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/tech-stack",
+              "architecture/database-schema"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Setup & Deployment",
+        "groups": [
+          {
+            "group": "Local Development",
+            "pages": [
+              "setup/prerequisites",
+              "setup/installation",
+              "setup/environment-variables"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/tmdb",
+              "integrations/gemini",
+              "integrations/jwt-auth"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/vercel"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/register",
+              "api/auth/login"
+            ]
+          },
+          {
+            "group": "Films",
+            "pages": [
+              "api/films/search",
+              "api/films/details"
+            ]
+          },
+          {
+            "group": "Analysis",
+            "pages": [
+              "api/analysis/generate",
+              "api/analysis/get"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/users/profile",
+              "api/users/favorites"
+            ]
+          },
+          {
+            "group": "Admin",
+            "pages": [
+              "api/admin/overview"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Adaptive AI analysis: automatically classifies films as 'entertainment' or 'deep/arthouse' and generates a tailored analysis",
+    "Google Gemini 1.5 Flash integration for structured cinematic analysis in Spanish",
+    "TMDB API v3 integration for film metadata, genres, keywords, and posters",
+    "Analysis caching in MySQL to avoid redundant AI calls and reduce costs",
+    "Three-tier user roles: Guest, Registered, and Admin with role-based access control",
+    "JWT-based authentication with onboarding flow and cinephile level profiling",
+    "Favorites system for registered users to save films",
+    "Admin panel for managing films, regenerating AI analyses, and monitoring",
+    "Search history tracking per user",
+    "Two analysis modes: Entertainment (spoiler-free summary, epic moments, easter eggs) and Deep (symbolism, themes, cultural context, director analysis)"
+  ],
+  "publicApiSurface": [
+    "POST /api/auth/register — Register a new user",
+    "POST /api/auth/login — Authenticate and receive JWT",
+    "GET /api/peliculas/buscar?q={query} — Search films via TMDB",
+    "GET /api/peliculas/:id — Get film details",
+    "POST /api/analisis/generar — Generate AI analysis for a film",
+    "GET /api/analisis/:peliculaId — Retrieve stored analysis for a film",
+    "GET /api/usuarios/perfil — Get current user profile",
+    "POST /api/usuarios/favoritos — Add film to favorites",
+    "DELETE /api/usuarios/favoritos/:peliculaId — Remove film from favorites",
+    "GET /api/admin/peliculas — List all films (admin only)",
+    "POST /api/admin/analisis/regenerar/:id — Force-regenerate AI analysis (admin only)"
+  ]
+}
